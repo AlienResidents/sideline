@@ -224,6 +224,18 @@ Two things the first draft got wrong, both caught before publishing:
    `brew install --cask --dry-run local/sideline/sideline`. That reported
    "Would install 1 cask" on the Linux host with the guarded hook in place.
 
+Homebrew 7 also gates casks from a non-official tap: the throwaway tap
+dry-run reported "Trusted cask local/sideline/sideline" only because `tap-new`
+taps are trusted implicitly. A GitHub tap is not, and `brew trust --help`
+confirms the command exists ("Trust non-official tap formulae, casks or
+commands so Homebrew may load them", stored in `~/.homebrew/trust.json`). So
+installing from the published tap is two steps, not one:
+
+```
+brew trust AlienResidents/tap
+brew install --cask AlienResidents/tap/sideline
+```
+
 Publishing to `AlienResidents/homebrew-tap` needs a token with write access to
 that repository. `GITHUB_TOKEN` is scoped to this repository, so the workflow
 takes the tap token from `HOMEBREW_TAP_GITHUB_TOKEN` and, while that secret is
