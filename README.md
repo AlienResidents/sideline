@@ -322,9 +322,12 @@ panes on its tick, so this costs no extra process and no prompt hook.
 - The status is derived the same way. A shell at its prompt is `waiting` and
   anything else in the pane is `working`. No writer has to report it, which is
   what covers harnesses that have no integration of their own.
-- A pane row is deleted when its pane closes, when the tmux server changes, or
-  when a real writer claims the pane, such as the oh-my-pi extension reporting
-  its own task. The agent's row then keeps the pane in the roster.
+- A row bound to a pane is deleted when that pane closes or when the tmux
+  server changes, whoever wrote the row. A task with no pane binding is never
+  swept.
+- A shell row is also deleted when a real writer claims the pane, such as the
+  oh-my-pi extension reporting its own task. That row then keeps the pane in
+  the roster.
 - `sideline clear pane-1` is undone on the next tick while the pane lives. To
   keep a pane out of the roster, bind a row to it or turn the sidebar off.
 

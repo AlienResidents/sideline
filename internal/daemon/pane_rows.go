@@ -22,9 +22,10 @@ func paneRowID(paneID string) string {
 // the pane stays in the roster through that row. When the agent's row is
 // cleared by hand, the next tick creates the shell row again.
 //
-// A shell row is removed when its pane is gone, when the pane id has been
-// reused by a new tmux server (the boot time no longer matches), or when a
-// real writer has taken the pane over.
+// Any row bound to a pane is removed when that pane is gone, whatever wrote
+// it: a row that points at a dead pane is stale by definition, and it would
+// otherwise sit in the roster for ever. A row with no pane binding is kept,
+// and a shell row is also removed when a real writer takes the pane over.
 //
 // The plan is pure so the ownership rules are testable without a daemon.
 func planPaneRows(panes []tmux.Pane, tasks []model.Task, boot string) (creates []model.Task, clears []string) {
@@ -65,18 +66,25 @@ func planPaneRows(panes []tmux.Pane, tasks []model.Task, boot string) (creates [
 	}
 
 	for _, t := range tasks {
-		if t.Owner != model.OwnerShell {
+		b := t.Bind
+		// A row with no pane binding is a task in its own right: it is never
+		// swept, because nothing about it depends on a pane.
+		if b == nil || b.Kind != model.BindPane || b.PaneID == "" {
+			if t.Owner == model.OwnerShell {
+				// A shell row without a binding can never resolve again.
+				clears = append(clears, t.ID)
+			}
 			continue
 		}
-		b := t.Bind
 		switch {
-		case b == nil || b.Kind != model.BindPane || b.PaneID == "":
+		// The pane belonged to an older tmux server: the id now points at a
+		// different pane or at nothing.
+		case b.Boot != "" && boot != "" && b.Boot != boot:
 			clears = append(clears, t.ID)
 		case !live[b.PaneID]:
 			clears = append(clears, t.ID)
-		case claimed[b.PaneID]:
-			clears = append(clears, t.ID)
-		case b.Boot != "" && boot != "" && b.Boot != boot:
+		// A real writer took the pane over, so the shell row is a duplicate.
+		case t.Owner == model.OwnerShell && claimed[b.PaneID]:
 			clears = append(clears, t.ID)
 		}
 	}

@@ -127,15 +127,37 @@ func TestPlanPaneRowsClearsUnboundShellRow(t *testing.T) {
 	}
 }
 
-func TestPlanPaneRowsNeverClearsAUserRow(t *testing.T) {
-	// Rows a person or an agent wrote survive their pane going away.
-	tasks := []model.Task{{
-		ID:    "repo-1",
-		Title: "Keep me",
-		Bind:  &model.Binding{Kind: model.BindPane, PaneID: "%1"},
-	}}
+func TestPlanPaneRowsKeepsUnboundUserRow(t *testing.T) {
+	// A row with no pane binding is a task in its own right, so it is never
+	// swept.
+	tasks := []model.Task{{ID: "inbox", Title: "Keep me", Status: "working"}}
 	_, clears := planPaneRows(nil, tasks, "100")
 	if len(clears) != 0 {
+		t.Fatalf("clears = %v", clears)
+	}
+}
+
+func TestPlanPaneRowsKeepsBoundRowWhilePaneLives(t *testing.T) {
+	panes := []tmux.Pane{{PaneID: "%1", Command: "omp", Path: "/x/repo", Boot: "100"}}
+	tasks := []model.Task{{
+		ID:    "repo-1",
+		Title: "Agent task",
+		Bind:  &model.Binding{Kind: model.BindPane, PaneID: "%1", Boot: "100"},
+	}}
+	if _, clears := planPaneRows(panes, tasks, "100"); len(clears) != 0 {
+		t.Fatalf("clears = %v", clears)
+	}
+}
+
+func TestPlanPaneRowsClearsAgentRowForDeadPane(t *testing.T) {
+	// Regression: a writer's row outlived its pane and sat in the roster.
+	tasks := []model.Task{{
+		ID:    "tmp-202",
+		Title: "tmp-202",
+		Bind:  &model.Binding{Kind: model.BindPane, PaneID: "%202", Boot: "100"},
+	}}
+	_, clears := planPaneRows(nil, tasks, "100")
+	if len(clears) != 1 || clears[0] != "tmp-202" {
 		t.Fatalf("clears = %v", clears)
 	}
 }
