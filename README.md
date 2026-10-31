@@ -135,7 +135,7 @@ and arm64, plus `checksums.txt`. An archive holds `sideline`, `LICENSE` and
 `README.md`.
 
 ```sh
-VERSION=1.0.0
+VERSION=1.0.1
 OS=$(uname -s | tr 'A-Z' 'a-z')
 ARCH=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
 BASE="https://github.com/AlienResidents/sideline/releases/download/v${VERSION}"
@@ -368,7 +368,7 @@ status ping never erases a title.
 
 ```
 $ sideline status
-sideline 1.0.0
+sideline 1.0.1
 daemon     running, pid 4211, up 2h04m
 config     ~/.config/sideline/config.yaml
 state      ~/.local/state/sideline/state.json
