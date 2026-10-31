@@ -203,3 +203,30 @@ Verified locally with GoReleaser 2.19.0: `check` reports a valid config, and
 `release --snapshot --clean` produced the four archives, each holding
 `sideline`, `LICENSE` and `README.md`. The extracted binary reports 1.0.0 and
 `shasum -a 256 -c checksums.txt` verifies all four.
+
+## D25: Homebrew ships a cask, and publishing it is gated on a token
+
+GoReleaser deprecates `brews` from v2.10 (soft since v2.16) and says formulas
+existed only because that was the way to reach Linuxbrew "at the time, but
+this is no longer true, and Casks should be used instead". The cask route was
+checked on the target rather than assumed: on the Linux host, Homebrew 7.0.11
+resolves casks (`brew info --cask`, `--cask` and `--dry-run` all present) and
+`brew install --cask --dry-run iterm2` reports "Would install 1 cask".
+
+Two things the first draft got wrong, both caught before publishing:
+
+1. The macOS quarantine-removal hook ran on Linux too, where `/usr/bin/xattr`
+   does not exist. It is now wrapped in `on_macos do ... end` inside
+   `postflight_steps`.
+2. Homebrew refuses a cask outside a tap ("Homebrew requires casks to be in a
+   tap"), so validating the generated file needs a throwaway local tap:
+   `brew tap-new --no-git local/sideline`, copy the `.rb` into it, then
+   `brew install --cask --dry-run local/sideline/sideline`. That reported
+   "Would install 1 cask" on the Linux host with the guarded hook in place.
+
+Publishing to `AlienResidents/homebrew-tap` needs a token with write access to
+that repository. `GITHUB_TOKEN` is scoped to this repository, so the workflow
+takes the tap token from `HOMEBREW_TAP_GITHUB_TOKEN` and, while that secret is
+absent, runs GoReleaser with `--skip=homebrew`. Releases therefore keep
+shipping archives and checksums whether or not the tap is ready; `--skip=homebrew`
+was verified against a snapshot run.

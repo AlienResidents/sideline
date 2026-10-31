@@ -39,11 +39,27 @@ jobs:
       - name: Test
         run: go test ./...
 
+      # The Homebrew cask lands in a different repository, and GITHUB_TOKEN
+      # cannot write there. Until the tap token exists, skip that pipe so a
+      # release still ships the archives and checksums.
+      - name: Choose release arguments
+        id: args
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          if [ -n "${TAP_TOKEN:-}" ]; then
+            printf 'value=release --clean\n' >> "$GITHUB_OUTPUT"
+          else
+            printf 'value=release --clean --skip=homebrew\n' >> "$GITHUB_OUTPUT"
+            printf 'no homebrew tap token; skipping the cask\n'
+          fi
+
       - name: Build and publish
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean
+          args: ${{ steps.args.outputs.value }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}

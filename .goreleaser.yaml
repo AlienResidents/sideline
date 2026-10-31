@@ -44,6 +44,39 @@ archives:
 checksum:
   name_template: checksums.txt
 
+# Homebrew: a cask, not a formula. GoReleaser deprecates `brews` from v2.10 and
+# says casks should be used instead; Homebrew on Linux installs casks too,
+# verified with `brew install --cask --dry-run` on Homebrew 7.
+#
+# Publishing needs a token that can write to AlienResidents/homebrew-tap.
+# GITHUB_TOKEN is scoped to this repository, so it cannot. The workflow passes
+# HOMEBREW_TAP_GITHUB_TOKEN and skips this pipe when the secret is absent.
+homebrew_casks:
+  - name: sideline
+    repository:
+      owner: AlienResidents
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Casks
+    homepage: https://github.com/AlienResidents/sideline
+    description: Task roster sidebar for tmux
+    license: MIT
+    binaries:
+      - sideline
+    # The release archive is the download; the cask installs the binary in it.
+    url:
+      template: "https://github.com/AlienResidents/sideline/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    hooks:
+      post:
+        # The binaries are not signed or notarized, so macOS would otherwise
+        # refuse to run the freshly downloaded file.
+        # macOS only: Linux has no /usr/bin/xattr, and an unguarded step
+        # would fail the install on the Linux target this cask also serves.
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/sideline"]
+          end
+
 changelog:
   sort: asc
   filters:
