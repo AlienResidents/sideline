@@ -8,13 +8,13 @@ Evidence: `go version go1.27.2 darwin/arm64` is installed. `cargo` and `rustc` a
 
 ## D2: One daemon owns the state file
 
-Producers (CLI, editor hooks, agent extensions) send a JSON line over a unix socket. The daemon applies the change, writes the file atomically, and notifies renderers. Two writers never race on one file, and the pane-title fight that workmux has (daemon rewrites, extension re-asserts every 5 s) cannot happen because only the extension owns pane titles.
+Producers (CLI, editor hooks, agent extensions) send a JSON line over a unix socket. The daemon applies the change, writes the file atomically, and notifies renderers. Two writers never race on one file, and the pane-title fight a sidebar daemon can start (daemon rewrites, extension re-asserts every 5 s) cannot happen because only the extension owns pane titles.
 
 ## D3: Tasks, not agents
 
-The roster is a list of tasks. A task may bind to a tmux pane, a window, or an external target, but binding is optional. A task with no binding is a standing row. This is the property workmux cannot express, because every workmux row is an agent process.
+The roster is a list of tasks. A task may bind to a tmux pane, a window, or an external target, but binding is optional. A task with no binding is a standing row. A roster where every row is an agent process cannot express that.
 
-## D4: Config grammar stays close to workmux
+## D4: Config grammar follows an existing sidebar tool
 
 `sidebar`, `theme`, `status`, and `tasks` blocks, plus the `#[fg=...]` template directive subset and `{fill}`. Keeping the directive grammar means existing themes and templates translate without a rewrite, and it costs about 80 lines of parser.
 

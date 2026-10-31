@@ -116,8 +116,8 @@ func Resolve(t Theme) Palette {
 	set(&p.Warning, "warning")
 	set(&p.Danger, "danger")
 	set(&p.Accent, "accent")
-	// current_worktree_fg is the historical name from workmux configs; keep
-	// accepting it so old configs translate unchanged.
+	// current_worktree_fg is the historical key name in existing sidebar
+	// configs; keep accepting it so those configs translate unchanged.
 	set(&p.CurrentFg, "current_worktree_fg")
 	set(&p.CurrentRowBg, "current_row_bg")
 	set(&p.HighlightRowBg, "highlight_row_bg")

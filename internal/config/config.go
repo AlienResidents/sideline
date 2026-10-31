@@ -1,6 +1,6 @@
 // Package config loads and validates the sideline YAML config. Its shape
-// deliberately tracks workmux's config so an existing file translates by
-// dropping it in place.
+// deliberately tracks an existing sidebar tool's config so a file written for
+// that tool translates by dropping it in place.
 package config
 
 import (

@@ -152,8 +152,8 @@ set-hook -g session-created 'run-shell "sideline on"'
 ```
 
 Do not run two sidebar tools at once. If you are replacing another sidebar,
-turn it off first (`workmux sidebar off` for the reference tool) and remove
-its `session-created` hook, or both will fight for pane space.
+stop it with its own command and remove its `session-created` hook before
+starting sideline, or both will fight for pane space.
 
 ### Upgrading the binary
 

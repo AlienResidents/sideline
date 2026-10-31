@@ -1,5 +1,5 @@
 // Package format renders tmux-style format templates into styled lines. It
-// exists so a config written for workmux keeps working under sideline.
+// exists so a template written for another sidebar tool keeps working here.
 package format
 
 import (
