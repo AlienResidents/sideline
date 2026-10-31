@@ -232,7 +232,7 @@ func (s *Store) apply(req model.Request, now int64) error {
 			s.state = cur
 		}
 		return nil
-	case model.OpList, model.OpPing:
+	case model.OpList, model.OpPing, model.OpPoke:
 		return nil
 	default:
 		return fmt.Errorf("unknown op %q", req.Op)

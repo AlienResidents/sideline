@@ -26,9 +26,28 @@ renderer that reads a snapshot and repaints when it changes.
 ```
 omp extension ─┐
 sideline set ──┼─> daemon ─> state.json ─> renderer panes
-shell hook ────┘      │
+tmux hooks ────┘      │
                       └─> tmux (place and resize panes)
 ```
+
+## Latency
+
+A change reaches the screen in one of two ways. tmux hooks call
+`sideline poke` when a window or pane is created or destroyed, which reconciles
+immediately: measured on tmux 3.8, about 30 to 50 ms for a pane row and 50 to
+80 ms for a sidebar pane. The daemon's one-second tick is the fallback for
+anything the hooks do not cover, so the worst case is one second and the
+steady-state cost is one `list-panes` call per second.
+
+```
+set-hook -g after-new-window   'run-shell -b "sideline poke"'
+set-hook -g after-split-window 'run-shell -b "sideline poke"'
+set-hook -g after-kill-pane    'run-shell -b "sideline poke"'
+set-hook -g pane-exited        'run-shell -b "sideline poke"'
+```
+
+`sideline poke` exits 0 when no daemon is running, so the hooks are harmless
+while the sidebar is off.
 
 The daemon never writes pane titles. Titles belong to the program in the pane,
 which is why a title does not get fought over every few seconds.
@@ -36,9 +55,11 @@ which is why a title does not get fought over every few seconds.
 ## Requirements
 
 - macOS or Linux, amd64 or arm64.
-- tmux 3.0 or newer. The daemon uses `split-window -e` and pane options
-  (`set-option -p`, for the pane marker); both landed in the tmux 3.0 release
-  block, per tmux's `CHANGES`. Check with `tmux -V`. Tested on tmux 3.8.
+- tmux 3.1 or newer. The daemon uses `split-window -e` and pane options
+  (`set-option -p`, for the pane marker), which landed in tmux 3.0, and the
+  reflex hooks below use `pane-exited`, which landed in 3.1. Without the hooks
+  sideline still works on 3.0: it just falls back to its one-second tick.
+  Check with `tmux -V`. Tested on tmux 3.8.
 - Go 1.24 or newer, to build from source.
 
 `~/.local/bin` is the recommended install location: no root, no package
@@ -315,6 +336,7 @@ panes on its tick, so this costs no extra process and no prompt hook.
 | `sideline toggle` | flip the flag |
 | `sideline status` | version, daemon state, paths, counts |
 | `sideline reload` | re-read the config now |
+| `sideline poke` | reconcile panes now instead of on the next tick |
 | `sideline restart` | replace the daemon and rebuild the panes |
 | `sideline daemon` | run the daemon in the foreground |
 | `sideline render` | run one renderer (the pane does this) |

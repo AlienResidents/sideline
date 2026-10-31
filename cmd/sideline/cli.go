@@ -145,6 +145,16 @@ Statuses are free-form strings; the config file maps known ones to icons.
 Usage:
   sideline clear <id>
 `
+	usagePoke = `sideline poke - reconcile panes now
+
+Asks the running daemon to reconcile tmux panes immediately instead of waiting
+for its next tick. tmux hooks call this after a window or pane is created or
+destroyed. With no daemon running it does nothing and exits 0, so a hook never
+prints an error.
+
+Usage:
+  sideline poke
+`
 	usageList = `sideline list - print the current task state
 
 Prints the task state as JSON. Talks to the daemon when one is running and
@@ -190,4 +200,5 @@ var commandUsage = map[string]string{
 	"set":     usageSet,
 	"clear":   usageClear,
 	"list":    usageList,
+	"poke":    usagePoke,
 }

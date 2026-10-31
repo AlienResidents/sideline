@@ -84,10 +84,13 @@ type Pane struct {
 	WindowActive bool
 	// Sidebar is true when the pane carries this tool's renderer marker.
 	Sidebar bool
+	// Boot is the tmux server start time. Pane ids are reused when a server
+	// restarts, so a binding is only valid while this value matches.
+	Boot string
 }
 
 // listFormat must stay in sync with parsePane.
-const listFormat = "#{session_name}\x1f#{window_index}\x1f#{window_name}\x1f#{pane_index}\x1f#{pane_id}\x1f#{pane_current_command}\x1f#{pane_start_command}\x1f#{pane_title}\x1f#{pane_current_path}\x1f#{pane_width}\x1f#{pane_height}\x1f#{pane_active}\x1f#{window_active}\x1f#{" + roleOption + "}"
+const listFormat = "#{session_name}\x1f#{window_index}\x1f#{window_name}\x1f#{pane_index}\x1f#{pane_id}\x1f#{pane_current_command}\x1f#{pane_start_command}\x1f#{pane_title}\x1f#{pane_current_path}\x1f#{pane_width}\x1f#{pane_height}\x1f#{pane_active}\x1f#{window_active}\x1f#{" + roleOption + "}\x1f#{start_time}"
 
 // run executes tmux with args and returns stdout.
 func (c Client) run(args ...string) (string, error) {
@@ -137,7 +140,7 @@ func (c Client) ListPanes() ([]Pane, error) {
 
 func parsePane(line string) (Pane, error) {
 	f := strings.Split(line, "\x1f")
-	if len(f) != 14 {
+	if len(f) != 15 {
 		return Pane{}, fmt.Errorf("tmux: unexpected pane field count %d", len(f))
 	}
 	wi, _ := strconv.Atoi(f[1])
@@ -159,6 +162,7 @@ func parsePane(line string) (Pane, error) {
 		Active:       f[11] == "1",
 		WindowActive: f[12] == "1",
 		Sidebar:      f[13] == roleValue,
+		Boot:         f[14],
 	}, nil
 }
 

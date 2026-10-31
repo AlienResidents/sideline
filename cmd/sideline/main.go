@@ -78,12 +78,24 @@ func run(cmd string, args []string) int {
 		err = cmdClear(args)
 	case "list":
 		err = cmdList(args)
+	case "poke":
+		err = cmdPoke()
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "sideline %s: %v\n", cmd, err)
 		return 1
 	}
 	return 0
+}
+
+// cmdPoke asks the daemon to reconcile now. tmux hooks call it on window and
+// pane events, which turns a tick's worth of lag into one round trip. With no
+// daemon running there is nothing to reconcile, so it exits 0: a hook must
+// never print an error into the user's status line.
+func cmdPoke() error {
+	_, socketPath := paths(nil)
+	_, _ = ipc.Send(socketPath, model.Request{Op: model.OpPoke})
+	return nil
 }
 
 // cmdRender runs the sidebar renderer inside a tmux pane. The daemon starts

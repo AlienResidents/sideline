@@ -271,3 +271,24 @@ func TestEnabledFlagCorruptFileIsOff(t *testing.T) {
 		t.Fatal("corrupt flag file must read as disabled")
 	}
 }
+
+func TestPokeSignalsTheLoop(t *testing.T) {
+	d := &Daemon{wake: make(chan struct{}, 1)}
+	if resp := d.handle(model.Request{Op: model.OpPoke}); !resp.OK {
+		t.Fatalf("poke failed: %+v", resp)
+	}
+	select {
+	case <-d.wake:
+	default:
+		t.Fatal("poke did not signal the loop")
+	}
+	// A burst of events still yields one pass and never blocks.
+	for i := 0; i < 5; i++ {
+		if resp := d.handle(model.Request{Op: model.OpPoke}); !resp.OK {
+			t.Fatalf("poke %d failed", i)
+		}
+	}
+	if len(d.wake) != 1 {
+		t.Fatalf("queued wakeups = %d, want 1", len(d.wake))
+	}
+}

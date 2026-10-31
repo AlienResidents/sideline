@@ -115,7 +115,9 @@ const (
 	OpReload   = "reload"
 	OpShutdown = "shutdown"
 	OpStatus   = "status"
-	OpPing     = "ping"
+	// OpPoke asks the daemon to reconcile now instead of on its next tick.
+	OpPoke = "poke"
+	OpPing = "ping"
 )
 
 // Find returns the index of the task with id, or -1.

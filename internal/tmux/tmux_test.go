@@ -8,7 +8,7 @@ import (
 func TestParsePane(t *testing.T) {
 	// One line exactly as list-panes emits it: unit separators, twelve
 	// fields plus the sidebar marker.
-	line := "main\x1f2\x1fwork\x1f1\x1f%7\x1fomp\x1f\x1fBuild\x1f/tmp\x1f120\x1f40\x1f1\x1f0\x1frenderer"
+	line := "main\x1f2\x1fwork\x1f1\x1f%7\x1fomp\x1f\x1fBuild\x1f/tmp\x1f120\x1f40\x1f1\x1f0\x1frenderer\x1f1793430000"
 	p, err := parsePane(line)
 	if err != nil {
 		t.Fatal(err)
@@ -27,6 +27,9 @@ func TestParsePane(t *testing.T) {
 	}
 	if !p.Active || p.WindowActive || !p.Sidebar {
 		t.Fatalf("flags = active:%v windowActive:%v sidebar:%v", p.Active, p.WindowActive, p.Sidebar)
+	}
+	if p.Boot != "1793430000" {
+		t.Fatalf("boot = %q", p.Boot)
 	}
 }
 

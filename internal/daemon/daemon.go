@@ -20,9 +20,12 @@ import (
 	"github.com/AlienResidents/sideline/internal/tmux"
 )
 
-// tickPeriod is how often the daemon reconciles tmux panes. One second would
-// be chatty; tmux windows change on human timescales.
-const tickPeriod = 5 * time.Second
+// tickPeriod is how often the daemon reconciles tmux panes when nothing pokes
+// it. A window or pane opens and closes on human timescales, so this is only a
+// safety net: tmux hooks call `sideline poke` for the common events, which
+// reconciles at once. One second keeps the worst case short and still costs a
+// single list-panes call (about 6 ms) per tick.
+const tickPeriod = time.Second
 
 // Options is everything the daemon needs to run. Zero fields fall back to
 // the defaults from store and config, so a plain New(Options{}) runs.
@@ -107,6 +110,11 @@ type Daemon struct {
 	shutdown chan struct{}
 	stopOnce sync.Once
 
+	// wake is poked by `sideline poke`, which is how tmux hooks ask for an
+	// immediate reconcile. Buffered and coalesced: a burst of events still
+	// produces one pass.
+	wake chan struct{}
+
 	started time.Time
 }
 
@@ -162,6 +170,7 @@ func New(o Options) (*Daemon, error) {
 		cfgPath:  p,
 		dir:      dir,
 		shutdown: make(chan struct{}),
+		wake:     make(chan struct{}, 1),
 		started:  time.Now(),
 	}
 	if fi, err := os.Stat(p); err == nil {
@@ -290,6 +299,8 @@ func (d *Daemon) Run() error {
 			return err
 		case <-ticker.C:
 			d.reconcile()
+		case <-d.wake:
+			d.reconcile()
 		}
 	}
 }
@@ -336,6 +347,13 @@ func (d *Daemon) handle(req model.Request) model.Response {
 		return model.Response{OK: true}
 	case model.OpStatus:
 		return model.Response{OK: true, Info: d.info()}
+	case model.OpPoke:
+		select {
+		case d.wake <- struct{}{}:
+		default:
+			// A pass is already queued; this event needs nothing more.
+		}
+		return model.Response{OK: true}
 	case model.OpShutdown:
 		// Reply first: Run closes the socket on its way out, and the client
 		// must see OK before the connection drops.
@@ -390,7 +408,13 @@ func (d *Daemon) syncPaneRows(panes []tmux.Pane) {
 	if st == nil {
 		return
 	}
-	boot := d.client.ServerStart()
+	boot := ""
+	if len(panes) > 0 {
+		boot = panes[0].Boot
+	}
+	if boot == "" {
+		boot = d.client.ServerStart()
+	}
 	creates, clears := planPaneRows(panes, st.Tasks, boot)
 	for _, id := range clears {
 		if _, err := d.st.Apply(model.Request{Op: model.OpClear, ID: id}); err != nil {
