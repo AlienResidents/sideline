@@ -93,3 +93,40 @@ Two `sideline on` calls can both pass the "is anything listening" check before e
 ## D19: The sidebar never takes focus
 
 `split-window` makes the new pane active by default, so placing a sidebar would move the cursor out of the user's shell and every later switch into that window would land in the sidebar. The pane is created with `-d` (detached), which leaves the previous active pane in place. `splitArgs` is a pure function and a test asserts the flag is present for all four placements.
+
+## D20: Every pane gets a row, with no shell hook
+
+A pane with no writer was invisible, so plain shells and harnesses without an
+extension never appeared. The daemon now keeps one row per unclaimed pane
+(id `pane-<n>`, owner `shell`) on the tick it already runs, and the renderer
+reads the pane's live foreground command and derives the status from it:
+`waiting` at a shell prompt, `working` otherwise.
+
+The alternative, a `.bashrc` hook that binds the pane, was rejected: it forks
+a client on every prompt, and prompt-time writes still cannot follow a
+foreground command that changes without a prompt. The old tool needed a
+one-second refresher per pane for exactly that reason.
+
+## D21: Reconcile on tmux events, with a one-second fallback
+
+The five-second tick made a new window wait up to five seconds for its sidebar
+and a closed pane keep its row as long. `sideline poke` asks the daemon to
+reconcile immediately, and tmux hooks call it on new window, split, kill pane,
+pane exit and window unlink. Pokes coalesce, so a burst costs one pass.
+
+Measured on tmux 3.8: a pane row appears in 32 to 52 ms and a sidebar pane in
+52 to 83 ms, against a second or more on the tick alone. A typed `exit` adds
+five milliseconds after the pane dies; the rest of that pause is the shell
+itself, measured at 253 to 282 ms with sideline out of the picture.
+
+`pane-exited` is queried with `show-hooks -g pane-exited`, not with
+`show-hooks -g`, which does not list it even when set. A timestamp probe
+proved it fires before the hook was relied on.
+
+## D22: A row bound to a dead pane is swept, whoever wrote it
+
+Agent rows carry no owner, so the first sweep only removed `shell` rows and an
+agent row outlived its pane: the sidebar showed `tmp-202` bound to a pane that
+no longer existed. The sweep now clears any row whose pane binding no longer
+resolves, and any binding that belongs to an older tmux server. A row with no
+pane binding is never swept: that is a task in its own right.

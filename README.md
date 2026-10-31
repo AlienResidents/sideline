@@ -418,6 +418,19 @@ sideline set build --status working
 make all && sideline set build --status done
 ```
 
+### Shells
+
+[`examples/shell/`](examples/shell/) has ready-made helpers for bash, zsh and
+fish, plus the tmux hooks that make the sidebar react at once. They wrap a
+command as a task row:
+
+```sh
+sideline_run deploy -- ./deploy.sh
+```
+
+The row is `working` while the command runs, then `done`, or `blocked` with
+the exit code. Nothing there needs a running daemon.
+
 ## Design notes
 
 [`docs/decisions.md`](docs/decisions.md) records the settled choices and the

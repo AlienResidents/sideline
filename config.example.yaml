@@ -34,8 +34,9 @@ sidebar:
   auto_reload: true
 
   # Tmux-style templates. Directives are stateful until #[default].
-  # Placeholders: {status_icon} {primary} {secondary} {title} {group}
-  # {note} {status} {elapsed} {pane} {pane_title} {command} {window_index}
+  # Placeholders: {id} {status_icon} {primary} {secondary} {title} {group}
+  # {note} {status} {elapsed} {pane} {pane_title} {pane_suffix}
+  # {command} {window_index}
   # {fill} pads the line to the pane width. {git} {git_stats} {pr_checks}
   # {agent_icon} {agent_label} are empty and exist for template compatibility.
   templates:
