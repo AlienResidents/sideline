@@ -71,6 +71,16 @@ status:
   done: { icon: "", colour: "#9ece6a" }
   blocked: { icon: "", colour: "#f7768e" }
 
+# Glyph shown at the start of a row for the process running in the bound pane,
+# so an agent session and a shell are told apart at a glance. An entry here
+# adds to the built-in table; it does not replace it. The agent glyphs match
+# the ones the reference sidebar tool used.
+icons:
+  omp: { icon: "⌥", colour: "#e05735" }
+  pi: { icon: "π", colour: "#96bbb5" }
+  bash: { icon: "", colour: "#7aa2f7" }
+  zsh: { icon: "", colour: "#7aa2f7" }
+
 # Rows that always exist, even with no state written for them. Runtime status
 # is set with `sideline set <id> --status working`.
 tasks:

@@ -99,6 +99,34 @@ func tileTitles(t *testing.T, out string) []string {
 	return titles
 }
 
+func TestCommandIconPerProcess(t *testing.T) {
+	// An omp pane and a shell must be distinguishable at the start of a row.
+	cfg := testConfig()
+	cfg.Sidebar.Templates = config.Templates{
+		Compact: "{command_icon}{title}",
+		Tiles:   []string{"{command_icon}{title}"},
+	}
+	panes := []tmux.Pane{
+		{PaneID: "%1", Command: "omp", WindowIndex: 0, Session: "s"},
+		{PaneID: "%2", Command: "bash", WindowIndex: 1, Session: "s"},
+	}
+	st := &model.State{Tasks: []model.Task{
+		{ID: "a", Title: "agent", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%1"}},
+		{ID: "b", Title: "shell", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%2"}},
+		{ID: "c", Title: "loose"},
+	}}
+	out := format.Strip(Frame(Options{Config: cfg, State: st, Panes: panes, Width: 40, Height: 20}))
+	if !strings.Contains(out, "⌥agent") {
+		t.Fatalf("omp row missing its icon:\n%s", out)
+	}
+	if !strings.Contains(out, "\uf120shell") {
+		t.Fatalf("bash row missing its icon:\n%s", out)
+	}
+	if !strings.Contains(out, "loose") {
+		t.Fatalf("unbound row missing:\n%s", out)
+	}
+}
+
 func TestTilesDropEmptyLines(t *testing.T) {
 	// A task with no note must not leave a blank third line plus the
 	// separator: two blank lines between tiles looked like a gap.

@@ -60,16 +60,38 @@ func TestRenderTruncates(t *testing.T) {
 	}
 }
 
-func TestRenderFillWhenTooWide(t *testing.T) {
+func TestRenderOverflowKeepsTail(t *testing.T) {
 	got := Render("{title} {fill} {tail}", map[string]string{
 		"title": strings.Repeat("x", 30), "tail": "end",
 	}, pal(), 20)
 	if w := VisibleWidth(got); w != 20 {
 		t.Fatalf("width = %d, want 20", w)
 	}
-	// {fill} collapses to nothing and the line truncates instead of wrapping.
-	if s := Strip(got); strings.Contains(s, "end") {
-		t.Fatalf("overflow should truncate, got %q", s)
+	// The text before the fill slot shrinks, so the trailing column
+	// (the elapsed time in a real template) is never the casualty.
+	s := Strip(got)
+	if !strings.HasSuffix(s, "end") {
+		t.Fatalf("tail was cut: %q", s)
+	}
+	if !strings.Contains(s, "…") {
+		t.Fatalf("cut should be marked: %q", s)
+	}
+	if s != strings.Repeat("x", 15)+"… end" {
+		t.Fatalf("overflow = %q", s)
+	}
+}
+
+func TestRenderOverflowShavesAllPrefixSegments(t *testing.T) {
+	// When one segment cannot absorb the whole overflow, earlier segments
+	// give up their columns too, right to left.
+	got := Render("ab{title}{fill}{tail}", map[string]string{
+		"title": strings.Repeat("y", 30), "tail": "12m",
+	}, pal(), 20)
+	if w := VisibleWidth(got); w != 20 {
+		t.Fatalf("width = %d, want 20", w)
+	}
+	if s := Strip(got); !strings.HasSuffix(s, "12m") {
+		t.Fatalf("tail was cut: %q", s)
 	}
 }
 

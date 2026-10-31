@@ -190,6 +190,8 @@ func rowVars(r row, selected bool, cfg *config.Config, pal theme.Palette, now in
 		"note":         r.note,
 		"status":       r.status,
 		"status_icon":  statusIcon(r.status, cfg.Status, pal),
+		"command_icon": commandIcon(r.pane, cfg.Icons, pal),
+		"agent_icon":   commandIcon(r.pane, cfg.Icons, pal),
 		"elapsed":      config.FormatElapsed(now, r.activityTS),
 		"pane":         pane,
 		"pane_title":   paneTitle,
@@ -201,9 +203,27 @@ func rowVars(r row, selected bool, cfg *config.Config, pal theme.Palette, now in
 		"git":         "",
 		"git_stats":   "",
 		"pr_checks":   "",
-		"agent_icon":  "",
 		"agent_label": "",
 	}
+}
+
+// commandIcon is the glyph for the process running in the bound pane, so an
+// omp session and a shell are distinguishable at the start of a row. An
+// unbound task, or an unknown process, renders nothing. agent_icon is an
+// alias, kept so templates written for the reference tool keep working.
+func commandIcon(pane *tmux.Pane, icons map[string]config.IconStyle, pal theme.Palette) string {
+	if pane == nil || pane.Command == "" {
+		return ""
+	}
+	st, ok := icons[pane.Command]
+	if !ok || st.Icon == "" {
+		return ""
+	}
+	colour := st.Colour
+	if colour == "" {
+		colour = pal.Text
+	}
+	return "#[fg=" + colour + "]" + st.Icon + "#[default]"
 }
 
 // statusIcon wraps the configured status icon in a fg directive so

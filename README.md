@@ -228,12 +228,19 @@ sidebar:
       - "{secondary} {fill} {note}"
 ```
 
-Placeholders: `{status_icon}`, `{primary}` (title, highlighted when selected),
+Placeholders: `{command_icon}` (glyph for the process in the bound pane),
+`{status_icon}`, `{primary}` (title, highlighted when selected),
 `{secondary}` (group), `{title}`, `{group}`, `{note}`, `{status}`, `{elapsed}`,
 `{id}`, `{pane}`, `{pane_title}`, `{pane_suffix}`, `{command}`,
-`{window_index}`, `{fill}`. The names `{git}`, `{git_stats}`, `{pr_checks}`,
-`{agent_icon}`, and `{agent_label}` are accepted and empty, for compatibility
-with templates that expect them.
+`{window_index}`, `{fill}`. `{agent_icon}` is an alias for `{command_icon}`.
+The names `{git}`, `{git_stats}`, `{pr_checks}`, and `{agent_label}` are
+accepted and empty, for compatibility with templates that expect them.
+
+`{command_icon}` comes from the `icons:` map, keyed by the pane's process
+name: `omp` is `⌥`, `pi` is `π`, a shell is a terminal glyph.
+
+When a line is too long for the pane, the text before `{fill}` is shortened
+and marked with `…`, so the trailing `{elapsed}` column is never cut off.
 
 `{fill}` expands to the spaces that reach the pane width. Every line is padded
 or truncated to exactly the pane width, so a repaint never leaves stale text.

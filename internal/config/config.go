@@ -19,7 +19,16 @@ type Config struct {
 	Sidebar Sidebar                `yaml:"sidebar"`
 	Theme   Theme                  `yaml:"theme"`
 	Status  map[string]StatusStyle `yaml:"status"`
-	Tasks   []TaskDecl             `yaml:"tasks"`
+	// Icons maps a pane's process name to the glyph shown at the start of its
+	// row, so an omp pane and a shell are told apart at a glance.
+	Icons map[string]IconStyle `yaml:"icons"`
+	Tasks []TaskDecl           `yaml:"tasks"`
+}
+
+// IconStyle is one glyph and its colour.
+type IconStyle struct {
+	Icon   string `yaml:"icon"`
+	Colour string `yaml:"colour"`
 }
 
 // Sidebar controls pane geometry and row layout.
@@ -83,6 +92,22 @@ const (
 	iconBlocked = "󰅖" // alert octagon
 )
 
+// defaultIcons covers the processes the sidebar is likely to meet. The agent
+// glyphs match the ones the reference tool used, so an omp pane reads the
+// same as it did before.
+func defaultIcons() map[string]IconStyle {
+	return map[string]IconStyle{
+		"omp":    {Icon: "⌥", Colour: "#e05735"},
+		"pi":     {Icon: "π", Colour: "#96bbb5"},
+		"claude": {Icon: "CC", Colour: "#d97757"},
+		"codex":  {Icon: "CX", Colour: "#10a37f"},
+		"bash":   {Icon: "\uf120", Colour: "#7aa2f7"},
+		"zsh":    {Icon: "\uf120", Colour: "#7aa2f7"},
+		"sh":     {Icon: "\uf120", Colour: "#7aa2f7"},
+		"fish":   {Icon: "\uf120", Colour: "#7aa2f7"},
+	}
+}
+
 // defaultStatus is the status map handed out by Default and filled in by
 // Validate when the config file has no status block.
 func defaultStatus() map[string]StatusStyle {
@@ -109,19 +134,20 @@ func Default() *Config {
 			Nerdfont:   true,
 			AutoReload: boolPtr(true),
 			Templates: Templates{
-				Compact: "{status_icon} {title} {fill} {elapsed}",
+				Compact: "{command_icon} {status_icon} {title} {fill} {elapsed}",
 				Tiles: []string{
-					"{status_icon} #[bold]{title}#[default] {fill} {elapsed}",
+					"{command_icon} {status_icon} #[bold]{title}#[default] {fill} {elapsed}",
 					"{group} {fill} {git}",
 					"{note}",
 				},
 				Horizontal: []string{
-					"{status_icon} {title} {pane} {fill} {elapsed}",
+					"{command_icon} {status_icon} {title} {pane} {fill} {elapsed}",
 					"{group} {fill} {note}",
 				},
 			},
 		},
 		Status: defaultStatus(),
+		Icons:  defaultIcons(),
 	}
 }
 
@@ -222,6 +248,17 @@ func (c *Config) Validate() error {
 	}
 	if len(c.Status) == 0 {
 		c.Status = defaultStatus()
+	}
+	// A user icon block adds to the defaults rather than replacing them: a
+	// config that names only bash must not lose the omp glyph.
+	if c.Icons == nil {
+		c.Icons = defaultIcons()
+	} else {
+		for name, style := range defaultIcons() {
+			if _, ok := c.Icons[name]; !ok {
+				c.Icons[name] = style
+			}
+		}
 	}
 	return nil
 }

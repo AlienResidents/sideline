@@ -170,6 +170,29 @@ func Render(tmpl string, vars map[string]string, pal theme.Palette, width int) s
 	for _, s := range segs {
 		base += VisibleWidth(s.text)
 	}
+	// An overflowing line would otherwise lose its tail at the right edge,
+	// and the tail is the elapsed column. Shave the text before the first
+	// fill slot instead (the title), so the right-hand columns survive.
+	if base > width && len(fillAt) > 0 {
+		over := base - width
+		for i := fillAt[0] - 1; i >= 0 && over > 0; i-- {
+			w := VisibleWidth(segs[i].text)
+			if w == 0 {
+				continue
+			}
+			if w <= over {
+				over -= w
+				segs[i].text = ""
+				continue
+			}
+			segs[i].text = truncateEllipsis(segs[i].text, w-over)
+			over = 0
+		}
+		base = 0
+		for _, s := range segs {
+			base += VisibleWidth(s.text)
+		}
+	}
 	pad := width - base
 	if pad < 0 {
 		pad = 0
@@ -255,6 +278,18 @@ func colourValue(v string, pal theme.Palette) (string, bool) {
 }
 
 // truncateTo cuts s to at most w visible columns without wrapping.
+// truncateEllipsis cuts s to w columns, ending in an ellipsis when the cut is
+// real, so a shortened title reads as shortened rather than misspelled.
+func truncateEllipsis(s string, w int) string {
+	if VisibleWidth(s) <= w {
+		return s
+	}
+	if w <= 1 {
+		return truncateTo(s, w)
+	}
+	return truncateTo(s, w-1) + "…"
+}
+
 func truncateTo(s string, w int) string {
 	if w <= 0 || s == "" {
 		return ""
