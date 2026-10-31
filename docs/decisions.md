@@ -70,11 +70,11 @@ The field is a `*bool` so an absent key means on. A plain `bool` would make "not
 
 `sideline reload` forces a config re-read even with `auto_reload: false`. The daemon reloads and bumps `State.ReloadSeq`; renderers watch the state file, so the bump is how a forced reload reaches a renderer that is not watching for mtime changes. `sideline restart` stops the daemon over the same socket, removes every sidebar pane, and starts a fresh daemon, which is the only way a newly installed binary takes effect inside existing panes.
 
-## D17: Version is 0.0.1, and the major stays 0 while the contract moves
+## D17: Version is 1.0.0, and the contract is now frozen
 
 The version lives in exactly one place, `internal/version/VERSION`, and is embedded with `go:embed`. `make`, a plain `go build`, and `go install ...@latest` therefore all report the same string, and a release bumps one file. An earlier draft stamped it with `-X main.version` from the Makefile, which would have split from the source constant at the first tag bump.
 
-Version policy, since the tool is new and the config surface is still moving:
+Version policy:
 
 | Range | Meaning |
 | --- | --- |
@@ -82,7 +82,14 @@ Version policy, since the tool is new and the config surface is still moving:
 | `0.x.y` | the command set and config keys are settling; breaking changes get a note |
 | `1.0.0` | config, CLI, and state file treated as a contract |
 
-The major stays 0 until those three are frozen.
+1.0.0 is reached once the contract covered what the tool does end to end:
+placement, templates, pane rows, event-driven reconcile, click and keyboard
+navigation, and the sweep rules, each with tests. From here a breaking change
+to the config keys, the CLI or the state file needs a major bump.
+
+Note on the earlier belief: this entry read "the major stays 0 while the
+contract moves" until the surface was frozen. The version-history table is
+kept above because it still describes what a pre-1.0 release meant.
 
 `sideline --version` prints it. `sideline status` prints the daemon's version and names a mismatch, so a daemon left over from an older install is visible as `note daemon is X, binary is Y; run sideline restart`.
 
