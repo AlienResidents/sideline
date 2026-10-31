@@ -127,6 +127,24 @@ func TestCommandIconPerProcess(t *testing.T) {
 	}
 }
 
+func TestAgentLabelPerProcess(t *testing.T) {
+	// {agent_label} carries the process name, so a reference-tool template
+	// that prints it works unchanged.
+	cfg := testConfig()
+	cfg.Sidebar.Templates = config.Templates{
+		Compact: "{agent_label}",
+		Tiles:   []string{"{agent_label}"},
+	}
+	panes := []tmux.Pane{{PaneID: "%1", Command: "omp", WindowIndex: 0, Session: "s"}}
+	st := &model.State{Tasks: []model.Task{
+		{ID: "a", Title: "t", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%1"}},
+	}}
+	out := format.Strip(Frame(Options{Config: cfg, State: st, Panes: panes, Width: 40, Height: 10}))
+	if !strings.Contains(out, "Oh My Pi") {
+		t.Fatalf("agent label missing:\n%s", out)
+	}
+}
+
 func TestTilesDropEmptyLines(t *testing.T) {
 	// A task with no note must not leave a blank third line plus the
 	// separator: two blank lines between tiles looked like a gap.

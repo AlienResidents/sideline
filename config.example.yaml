@@ -75,11 +75,12 @@ status:
 # so an agent session and a shell are told apart at a glance. An entry here
 # adds to the built-in table; it does not replace it. The agent glyphs match
 # the ones the reference sidebar tool used.
+# `label` feeds {agent_label}, for templates that print the process name.
 icons:
-  omp: { icon: "⌥", colour: "#e05735" }
-  pi: { icon: "π", colour: "#96bbb5" }
-  bash: { icon: "", colour: "#7aa2f7" }
-  zsh: { icon: "", colour: "#7aa2f7" }
+  omp: { icon: "⌥", colour: "#e05735", label: "Oh My Pi" }
+  pi: { icon: "π", colour: "#96bbb5", label: "Pi" }
+  bash: { icon: "", colour: "#7aa2f7", label: "Bash" }
+  zsh: { icon: "", colour: "#7aa2f7", label: "Zsh" }
 
 # Rows that always exist, even with no state written for them. Runtime status
 # is set with `sideline set <id> --status working`.

@@ -232,9 +232,10 @@ Placeholders: `{command_icon}` (glyph for the process in the bound pane),
 `{status_icon}`, `{primary}` (title, highlighted when selected),
 `{secondary}` (group), `{title}`, `{group}`, `{note}`, `{status}`, `{elapsed}`,
 `{id}`, `{pane}`, `{pane_title}`, `{pane_suffix}`, `{command}`,
-`{window_index}`, `{fill}`. `{agent_icon}` is an alias for `{command_icon}`.
-The names `{git}`, `{git_stats}`, `{pr_checks}`, and `{agent_label}` are
-accepted and empty, for compatibility with templates that expect them.
+`{window_index}`, `{fill}`. `{agent_icon}` is an alias for `{command_icon}`,
+and `{agent_label}` is the process name from the `icons:` map (`Oh My Pi`,
+`Bash`). The names `{git}`, `{git_stats}`, and `{pr_checks}` are accepted and
+empty, because sideline has no git or PR integration.
 
 `{command_icon}` comes from the `icons:` map, keyed by the pane's process
 name: `omp` is `⌥`, `pi` is `π`, a shell is a terminal glyph.

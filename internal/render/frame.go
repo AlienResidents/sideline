@@ -192,18 +192,19 @@ func rowVars(r row, selected bool, cfg *config.Config, pal theme.Palette, now in
 		"status_icon":  statusIcon(r.status, cfg.Status, pal),
 		"command_icon": commandIcon(r.pane, cfg.Icons, pal),
 		"agent_icon":   commandIcon(r.pane, cfg.Icons, pal),
+		"agent_label":  commandLabel(r.pane, cfg.Icons),
 		"elapsed":      config.FormatElapsed(now, r.activityTS),
 		"pane":         pane,
 		"pane_title":   paneTitle,
 		"pane_suffix":  paneSuffix,
 		"command":      command,
 		"window_index": windowIndex,
-		// Placeholder vars exist so templates written for the reference tool
-		// load unchanged; sideline fills none of them in v1.
-		"git":         "",
-		"git_stats":   "",
-		"pr_checks":   "",
-		"agent_label": "",
+		// These exist so templates written for the reference tool load
+		// unchanged. sideline has no git or PR integration, so they stay
+		// empty; {agent_icon} and {agent_label} above are filled.
+		"git":       "",
+		"git_stats": "",
+		"pr_checks": "",
 	}
 }
 
@@ -224,6 +225,15 @@ func commandIcon(pane *tmux.Pane, icons map[string]config.IconStyle, pal theme.P
 		colour = pal.Text
 	}
 	return "#[fg=" + colour + "]" + st.Icon + "#[default]"
+}
+
+// commandLabel is the human name for the pane's process, feeding
+// {agent_label}. Empty when the task is unbound or the process is unknown.
+func commandLabel(pane *tmux.Pane, icons map[string]config.IconStyle) string {
+	if pane == nil {
+		return ""
+	}
+	return icons[pane.Command].Label
 }
 
 // statusIcon wraps the configured status icon in a fg directive so

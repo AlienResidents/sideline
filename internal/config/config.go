@@ -25,10 +25,13 @@ type Config struct {
 	Tasks []TaskDecl           `yaml:"tasks"`
 }
 
-// IconStyle is one glyph and its colour.
+// IconStyle is one glyph, its colour, and the human label for the process.
+// The label feeds {agent_label}, so a template written for the reference tool
+// that prints a process name works without edits.
 type IconStyle struct {
 	Icon   string `yaml:"icon"`
 	Colour string `yaml:"colour"`
+	Label  string `yaml:"label"`
 }
 
 // Sidebar controls pane geometry and row layout.
@@ -97,14 +100,14 @@ const (
 // same as it did before.
 func defaultIcons() map[string]IconStyle {
 	return map[string]IconStyle{
-		"omp":    {Icon: "⌥", Colour: "#e05735"},
-		"pi":     {Icon: "π", Colour: "#96bbb5"},
-		"claude": {Icon: "CC", Colour: "#d97757"},
-		"codex":  {Icon: "CX", Colour: "#10a37f"},
-		"bash":   {Icon: "\uf120", Colour: "#7aa2f7"},
-		"zsh":    {Icon: "\uf120", Colour: "#7aa2f7"},
-		"sh":     {Icon: "\uf120", Colour: "#7aa2f7"},
-		"fish":   {Icon: "\uf120", Colour: "#7aa2f7"},
+		"omp":    {Icon: "⌥", Colour: "#e05735", Label: "Oh My Pi"},
+		"pi":     {Icon: "π", Colour: "#96bbb5", Label: "Pi"},
+		"claude": {Icon: "CC", Colour: "#d97757", Label: "Claude"},
+		"codex":  {Icon: "CX", Colour: "#10a37f", Label: "Codex"},
+		"bash":   {Icon: "\uf120", Colour: "#7aa2f7", Label: "Bash"},
+		"zsh":    {Icon: "\uf120", Colour: "#7aa2f7", Label: "Zsh"},
+		"sh":     {Icon: "\uf120", Colour: "#7aa2f7", Label: "sh"},
+		"fish":   {Icon: "\uf120", Colour: "#7aa2f7", Label: "Fish"},
 	}
 }
 
