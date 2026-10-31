@@ -1,0 +1,77 @@
+# sideline example configuration
+#
+# Copy to $XDG_CONFIG_HOME/sideline/config.yaml (usually ~/.config/sideline).
+# Every key below is optional: a missing file loads the defaults.
+
+sidebar:
+  # left | right | top | bottom. Top and bottom use the horizontal templates.
+  position: left
+
+  # Width in columns for left/right. Height in rows for top/bottom.
+  width: 43
+  height: 8
+
+  # tiles | compact. `v` toggles this at runtime.
+  layout: tiles
+
+  # config | activity | title | window
+  sort: config
+
+  # Dim rows whose activity is older than stale_after seconds.
+  dim_stale: false
+  stale_after: 3600
+
+  # Use Nerd Font glyphs in the status column.
+  nerdfont: true
+
+  # Tmux-style templates. Directives are stateful until #[default].
+  # Placeholders: {status_icon} {primary} {secondary} {title} {group}
+  # {note} {status} {elapsed} {pane} {pane_title} {command} {window_index}
+  # {fill} pads the line to the pane width. {git} {git_stats} {pr_checks}
+  # {agent_icon} {agent_label} are empty and exist for template compatibility.
+  templates:
+    compact: "{status_icon} {primary} {fill} {elapsed}"
+    tiles:
+      - "{status_icon} #[bold]{primary}#[default] {fill} {elapsed}"
+      - "{secondary} {fill} {pane_title}"
+      - "{note}"
+    horizontal:
+      - "{status_icon} {primary} {pane_suffix} {fill} {elapsed}"
+      - "{secondary} {fill} {note}"
+
+theme:
+  # default | dark | light | custom
+  scheme: default
+  mode: dark
+  custom:
+    text: "#c0caf5"
+    dimmed: "#565f89"
+    border: "#2f3549"
+    header: "#bb9af7"
+    keycap: "#7dcfff"
+    success: "#9ece6a"
+    warning: "#e0af68"
+    danger: "#f7768e"
+    accent: "#bb9af7"
+    current_worktree_fg: "#7aa2f7"
+    current_row_bg: "#1f2335"
+    highlight_row_bg: "#292e42"
+
+# Status vocabulary. Any string works. A status with no entry falls back to a
+# plain icon and the theme text colour.
+status:
+  todo: { icon: "", colour: "#7aa2f7" }
+  working: { icon: "", colour: "#7aa2f7" }
+  waiting: { icon: "", colour: "#e0af68" }
+  done: { icon: "", colour: "#9ece6a" }
+  blocked: { icon: "", colour: "#f7768e" }
+
+# Rows that always exist, even with no state written for them. Runtime status
+# is set with `sideline set <id> --status working`.
+tasks:
+  - id: inbox
+    title: Inbox
+    group: personal
+  - id: deploy
+    title: Deploy check
+    group: ops

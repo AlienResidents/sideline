@@ -1,0 +1,5 @@
+/sideline
+/bin/
+/dist/
+*.test
+.DS_Store

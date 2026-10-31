@@ -1,0 +1,159 @@
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+// parseSetArgs parses the arguments of `sideline set` after the subcommand
+// name: the task id, then flags. It is pure so the flag grammar is testable
+// without a store or a daemon.
+//
+//	sideline set <id> [--title T] [--status S] [--group G] [--note N]
+//	              [--bind-pane %1] [--bind-window sess:1] [--bind-external URL]
+//
+// A missing id and a flag without a value are errors. Repeating a flag keeps
+// the last value, which is how a human reads a repeated flag.
+//
+// Only the flags present are returned, so `sideline set x --status done`
+// leaves the row's title and note alone. This is what makes status pings from
+// an editor or an agent cheap and lossless.
+func parseSetArgs(args []string) (string, map[string]string, error) {
+	if len(args) == 0 {
+		return "", nil, fmt.Errorf("set requires a task id")
+	}
+	id := args[0]
+	fields := map[string]string{}
+
+	for i := 1; i < len(args); i++ {
+		flag := args[i]
+		var key string
+		switch flag {
+		case "--title", "--status", "--group", "--note":
+			key = strings.TrimPrefix(flag, "--")
+		case "--bind-pane":
+			key = "bind_pane"
+		case "--bind-window":
+			key = "bind_window"
+		case "--bind-external":
+			key = "bind_external"
+		default:
+			return "", nil, fmt.Errorf("unknown flag %q", flag)
+		}
+		if i+1 >= len(args) {
+			return "", nil, fmt.Errorf("%s requires a value", flag)
+		}
+		i++
+		fields[key] = args[i]
+	}
+	return id, fields, nil
+}
+
+// wantsHelp reports whether args ask for help.
+func wantsHelp(args []string) bool {
+	for _, a := range args {
+		if a == "-h" || a == "--help" {
+			return true
+		}
+	}
+	return false
+}
+
+// Help texts, one per subcommand; every subcommand answers --help with exit 0.
+const (
+	usageDaemon = `sideline daemon - run the task-roster daemon in the foreground
+
+The daemon owns the state file, serves the client socket, and keeps one
+sidebar pane per tmux window. Only one daemon can run at a time.
+
+Usage:
+  sideline daemon [--state PATH] [--socket PATH] [--tmux-socket PATH]
+
+--tmux-socket points the daemon at a non-default tmux server, which is how
+the smoke tests drive an isolated server.
+`
+	usageRender = `sideline render - run the sidebar renderer
+
+Runs the interactive roster renderer in a tmux pane. This is normally started
+by the daemon inside the sidebar pane, not typed by hand.
+
+Usage:
+  sideline render
+`
+	usageOn = `sideline on - ensure the sidebar is running
+
+Sets the enabled flag, starts the daemon if none is running, and lets the
+daemon place a sidebar pane in every tmux window.
+
+Usage:
+  sideline on
+`
+	usageOff = `sideline off - stop the sidebar
+
+Clears the enabled flag; the running daemon removes every sidebar pane on
+its next reconcile pass.
+
+Usage:
+  sideline off
+`
+	usageToggle = `sideline toggle - flip the sidebar on or off
+
+Usage:
+  sideline toggle
+`
+	usageSet = `sideline set - write one task row
+
+Creates or replaces the row with the given id. A set moves the row's activity
+timestamp, so a fresh set sorts to the top under activity sorting.
+
+Usage:
+  sideline set <id> [--title T] [--status S] [--group G] [--note N]
+                 [--bind-pane %1] [--bind-window sess:1] [--bind-external URL]
+
+Statuses are free-form strings; the config file maps known ones to icons.
+`
+	usageClear = `sideline clear - remove one task row
+
+Usage:
+  sideline clear <id>
+`
+	usageList = `sideline list - print the current task state
+
+Prints the task state as JSON. Talks to the daemon when one is running and
+reads the state file directly when it is not.
+
+Usage:
+  sideline list [--state PATH] [--socket PATH]
+`
+)
+
+// usage is the top-level help text.
+const usage = `sideline - task roster sidebar for tmux
+
+Usage:
+  sideline <command> [flags]
+
+Commands:
+  daemon    run the daemon in the foreground
+  render    run one sidebar renderer (used inside the pane)
+  on        ensure the sidebar is running
+  off       stop the sidebar
+  toggle    flip the sidebar on or off
+  set       write a task row
+  clear     remove a task row
+  list      print the current task state
+
+Run "sideline <command> --help" for command details.
+`
+
+// commandUsage maps a subcommand name to its help text.
+var commandUsage = map[string]string{
+	"daemon": usageDaemon,
+	"render": usageRender,
+	"on":     usageOn,
+	"off":    usageOff,
+	"toggle": usageToggle,
+	"set":    usageSet,
+	"clear":  usageClear,
+	"list":   usageList,
+}

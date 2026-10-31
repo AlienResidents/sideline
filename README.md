@@ -1,0 +1,221 @@
+# sideline
+
+A task roster sidebar for tmux.
+
+Most tmux sidebars show agents. sideline shows tasks. A task exists because a
+person, a script, or an editor put it there. It may point at a tmux pane, at a
+whole window, at a URL, or at nothing at all. That last case is the point: you
+can track a job that has no process attached to it.
+
+```
+o Inbox
+personal
+
+* Deploy pipeline                    18s
+ops
+hold release
+```
+
+## How it works
+
+One daemon owns the state file and keeps one sidebar pane in every tmux
+window. Any number of writers send it a one-line JSON request over a unix
+socket, so two processes never race on the same file. Each sidebar pane runs a
+renderer that reads a snapshot and repaints when it changes.
+
+```
+omp extension ─┐
+sideline set ──┼─> daemon ─> state.json ─> renderer panes
+shell hook ────┘      │
+                      └─> tmux (place and resize panes)
+```
+
+The daemon never writes pane titles. Titles belong to the program in the pane,
+which is why a title does not get fought over every few seconds.
+
+## Install
+
+Requires Go 1.24 or newer. macOS and Linux, amd64 and arm64.
+
+```
+go build -o ~/.local/bin/sideline ./cmd/sideline
+```
+
+Or cross-compile every target the project supports:
+
+```
+make build-all
+```
+
+Put the binary on `PATH`. The daemon spawns the renderer by absolute path, so
+the tmux server does not need your shell `PATH`.
+
+## Quick start
+
+```
+sideline on                    # start the daemon and place the sidebar
+sideline set inbox --title "Inbox" --group personal
+sideline set inbox --status working
+sideline list                  # JSON snapshot
+sideline off                   # remove every sidebar pane
+```
+
+Start it automatically with your session:
+
+```tmux
+set-hook -g session-created 'run-shell "sideline on"'
+```
+
+Do not run two sidebar tools at once. If you are replacing another sidebar,
+remove its `session-created` hook first, or both will fight for pane space.
+
+## Configuration
+
+Config lives at `$SIDELINE_CONFIG`, else
+`$XDG_CONFIG_HOME/sideline/config.yaml`, else `~/.config/sideline/config.yaml`.
+A missing file is fine: the defaults are complete. See
+[`config.example.yaml`](config.example.yaml).
+
+### Placement
+
+```yaml
+sidebar:
+  position: left   # left | right | top | bottom
+  width: 43        # columns, used by left and right
+  height: 8        # rows, used by top and bottom
+```
+
+`top` and `bottom` use the `horizontal` template set, because a three-line
+tile does not fit in eight rows.
+
+Changing `position` at runtime tears the panes down and rebuilds them on the
+new edge. Changing `width` or `height` resizes in place.
+
+### Templates
+
+Templates use the tmux format grammar, so a template written for another
+sidebar tool usually works unchanged. Directives are stateful until
+`#[default]`.
+
+```yaml
+sidebar:
+  templates:
+    compact: "{status_icon} {primary} {fill} {elapsed}"
+    tiles:
+      - "{status_icon} #[bold]{primary}#[default] {fill} {elapsed}"
+      - "{secondary} {fill} {pane_title}"
+      - "{note}"
+    horizontal:
+      - "{status_icon} {primary} {pane_suffix} {fill} {elapsed}"
+      - "{secondary} {fill} {note}"
+```
+
+Placeholders: `{status_icon}`, `{primary}` (title, highlighted when selected),
+`{secondary}` (group), `{title}`, `{group}`, `{note}`, `{status}`, `{elapsed}`,
+`{id}`, `{pane}`, `{pane_title}`, `{pane_suffix}`, `{command}`,
+`{window_index}`, `{fill}`. The names `{git}`, `{git_stats}`, `{pr_checks}`,
+`{agent_icon}`, and `{agent_label}` are accepted and empty, for compatibility
+with templates that expect them.
+
+`{fill}` expands to the spaces that reach the pane width. Every line is padded
+or truncated to exactly the pane width, so a repaint never leaves stale text.
+
+### Status vocabulary
+
+Statuses are free strings. The `status` map only decides the icon and colour:
+
+```yaml
+status:
+  todo:    { icon: "", colour: "#7aa2f7" }
+  working: { icon: "", colour: "#7aa2f7" }
+  waiting: { icon: "", colour: "#e0af68" }
+  done:    { icon: "", colour: "#9ece6a" }
+  blocked: { icon: "", colour: "#f7768e" }
+```
+
+A status with no entry renders the default status style.
+
+### Tasks declared in config
+
+```yaml
+tasks:
+  - id: inbox
+    title: Inbox
+    group: personal
+```
+
+A declared task always has a row. `sideline set inbox --status working` fills
+in its runtime state without changing the declaration. Declarations are
+overridden field by field by state rows, so a `set --title` wins until the
+state row is cleared.
+
+## Commands
+
+| Command | Purpose |
+| --- | --- |
+| `sideline on` | set the enabled flag, start the daemon, place panes |
+| `sideline off` | clear the flag, remove every sidebar pane |
+| `sideline toggle` | flip the flag |
+| `sideline daemon` | run the daemon in the foreground |
+| `sideline render` | run one renderer (the pane does this) |
+| `sideline set <id> [flags]` | create or patch one task |
+| `sideline clear <id>` | remove one task |
+| `sideline list` | print the state as JSON |
+
+`set` flags: `--title`, `--status`, `--group`, `--note`, `--bind-pane`,
+`--bind-window`, `--bind-external`. Only the flags you pass are written, so a
+status ping never erases a title.
+
+`set` and `clear` talk to the daemon when it is running and fall back to a
+flock-guarded direct write when it is not.
+
+## Keyboard
+
+Inside the sidebar pane: `j`/`k` or arrows move, `g`/`G` jump to the ends,
+`enter` focuses the bound pane or window, `v` toggles tiles and compact,
+`/` filters, `esc` clears the filter, `ctrl+c` exits the renderer (the daemon
+starts a new one on its next pass).
+
+## Files
+
+| Path | Content |
+| --- | --- |
+| `$XDG_STATE_HOME/sideline/state.json` | task state, owned by the daemon |
+| `$XDG_STATE_HOME/sideline/sideline.sock` | client socket, mode 0600 |
+| `$XDG_STATE_HOME/sideline/enabled` | the on/off flag |
+
+`SIDELINE_STATE_DIR` moves all three. The daemon passes the resolved paths to
+each renderer pane, so a non-default directory works end to end.
+
+## Editor and agent integration
+
+[`examples/omp/sideline-status.ts`](examples/omp/sideline-status.ts) is an
+oh-my-pi extension that reports the session status as a task. Copy it to
+`~/.omp/agent/extensions/`.
+
+The same pattern works for anything that can run a command:
+
+```
+sideline set build --status working
+make all && sideline set build --status done
+```
+
+## Design notes
+
+[`docs/decisions.md`](docs/decisions.md) records the settled choices and the
+evidence behind them.
+
+## Development
+
+```
+go test ./...
+go vet ./...
+gofmt -l .
+```
+
+The daemon accepts `--tmux-socket PATH`, which is how the smoke tests drive an
+isolated tmux server without touching a live session.
+
+## License
+
+MIT.
