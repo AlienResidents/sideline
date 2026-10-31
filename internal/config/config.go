@@ -48,6 +48,10 @@ type Sidebar struct {
 	// AutoReload applies a changed config file as soon as it parses. A
 	// pointer so an absent key means "on" rather than Go's false zero value.
 	AutoReload *bool `yaml:"auto_reload"`
+	// Gutter is the width of the indicator column left of each tile. The row
+	// for the window you are looking at gets a bright bar, the rest a dim
+	// one, which is how the eye finds the live session.
+	Gutter int `yaml:"gutter"`
 }
 
 // AutoReloadOn reports whether config changes apply without an explicit
@@ -136,6 +140,7 @@ func Default() *Config {
 			StaleAfter: 3600,
 			Nerdfont:   true,
 			AutoReload: boolPtr(true),
+			Gutter:     2,
 			Templates: Templates{
 				Compact: "{command_icon} {status_icon} {title} {fill} {elapsed}",
 				Tiles: []string{
@@ -245,6 +250,12 @@ func (c *Config) Validate() error {
 	}
 	if c.Sidebar.Height > 40 {
 		c.Sidebar.Height = 40
+	}
+	if c.Sidebar.Gutter < 0 {
+		c.Sidebar.Gutter = 0
+	}
+	if c.Sidebar.Gutter > 4 {
+		c.Sidebar.Gutter = 4
 	}
 	if c.Status == nil {
 		c.Status = map[string]StatusStyle{}

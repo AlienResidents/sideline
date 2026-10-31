@@ -19,6 +19,9 @@ func testConfig() *config.Config {
 	cfg.Sidebar.Width = 43
 	cfg.Sidebar.Height = 20
 	cfg.Sidebar.Layout = "tiles"
+	// Geometry tests are about template expansion; the gutter has its own
+	// test and would shift every expected column.
+	cfg.Sidebar.Gutter = 0
 	cfg.Sidebar.Templates = config.Templates{
 		Compact:    "{status_icon} {title} {note}",
 		Tiles:      []string{"{primary}", "{group}", "{note}"},
@@ -124,6 +127,88 @@ func TestCommandIconPerProcess(t *testing.T) {
 	}
 	if !strings.Contains(out, "loose") {
 		t.Fatalf("unbound row missing:\n%s", out)
+	}
+}
+
+func TestGutterMarksCurrentRow(t *testing.T) {
+	cfg := testConfig()
+	cfg.Sidebar.Gutter = 2
+	cfg.Sidebar.Templates = config.Templates{Tiles: []string{"{primary}"}}
+	panes := []tmux.Pane{
+		{PaneID: "%1", Command: "omp", Active: true, WindowActive: true, Session: "s"},
+		{PaneID: "%2", Command: "omp", Active: true, WindowActive: false, Session: "s"},
+	}
+	st := &model.State{Tasks: []model.Task{
+		{ID: "a", Title: "front", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%1"}},
+		{ID: "b", Title: "back", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%2"}},
+	}}
+	out := Frame(Options{Config: cfg, State: st, Panes: panes, Width: 43, Height: 20})
+	checkPane(t, out, 43, 20)
+	lines := strings.Split(format.Strip(out), "\n")
+	for _, want := range []string{"▌ front", "▌ back"} {
+		found := false
+		for _, l := range lines {
+			if strings.HasPrefix(l, want) {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("missing gutter bar for %q in:\n%s", want, out)
+		}
+	}
+}
+
+func TestCurrentRowGetsBand(t *testing.T) {
+	cfg := testConfig()
+	cfg.Sidebar.Gutter = 0
+	cfg.Sidebar.Templates = config.Templates{Tiles: []string{"{primary}", "{note}"}}
+	panes := []tmux.Pane{
+		{PaneID: "%1", Command: "omp", Active: true, WindowActive: true, Session: "s"},
+		{PaneID: "%2", Command: "omp", Active: true, WindowActive: false, Session: "s"},
+	}
+	st := &model.State{Tasks: []model.Task{
+		{ID: "a", Title: "front", Note: "x", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%1"}},
+		{ID: "b", Title: "back", Note: "y", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%2"}},
+	}}
+	out := Frame(Options{Config: cfg, State: st, Panes: panes, Width: 43, Height: 20})
+	// #1f2335 is the default current_row_bg.
+	const band = "\x1b[48;2;31;35;53m"
+	var front, back []string
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "front") {
+			front = append(front, line)
+		}
+		if strings.Contains(line, "back") {
+			back = append(back, line)
+		}
+	}
+	if len(front) == 0 || !strings.Contains(front[0], band) {
+		t.Fatalf("live row has no background band: %q", front)
+	}
+	for _, line := range back {
+		if strings.Contains(line, band) {
+			t.Fatalf("inactive row carries the band: %q", line)
+		}
+	}
+}
+
+func TestActiveWindowRowIsHighlighted(t *testing.T) {
+	// The reference sidebar highlights the row for the window you are
+	// looking at, not a cursor, so the eye lands on the live session.
+	cfg := testConfig()
+	cfg.Theme.Custom = map[string]string{"current_worktree_fg": "#123456"}
+	cfg.Sidebar.Templates = config.Templates{Tiles: []string{"{primary}"}}
+	panes := []tmux.Pane{
+		{PaneID: "%1", Command: "omp", Active: true, WindowActive: true, Session: "s", WindowIndex: 0},
+		{PaneID: "%2", Command: "omp", Active: true, WindowActive: false, Session: "s", WindowIndex: 1},
+	}
+	st := &model.State{Tasks: []model.Task{
+		{ID: "a", Title: "front", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%1"}},
+		{ID: "b", Title: "back", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%2"}},
+	}}
+	out := Frame(Options{Config: cfg, State: st, Panes: panes, Width: 40, Height: 20})
+	if got := strings.Count(out, "38;2;18;52;86"); got != 1 {
+		t.Fatalf("highlight colour applied %d times, want 1:\n%s", got, out)
 	}
 }
 

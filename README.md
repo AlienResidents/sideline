@@ -183,6 +183,19 @@ sidebar:
 `top` and `bottom` use the `horizontal` template set, because a three-line
 tile does not fit in eight rows.
 
+### Gutter
+
+```yaml
+sidebar:
+  gutter: 2    # columns, 0 removes it
+```
+
+A two-column indicator column sits left of every tile: a bright bar for the
+row of the window you are looking at, a dim one for the rest. The same live row
+gets a subtle background band across its full width, and its title takes the
+`current_worktree_fg` colour. That is the row-level "you are here" marker; the
+cursor selection adds the same treatment to whichever row you move onto.
+
 ### Reloading
 
 ```yaml

@@ -1,6 +1,7 @@
 package render
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -111,15 +112,33 @@ func blockLines(cfg *config.Config, rows []row, o Options, pal theme.Palette, no
 	if len(tiles) == 0 {
 		tiles = []string{"{title}"}
 	}
+	// The gutter costs columns from every tile line, not from the pane.
+	gutter := cfg.Sidebar.Gutter
+	if gutter < 0 || gutter > width/2 {
+		gutter = 0
+	}
+	contentWidth := width - gutter
+
 	var lines []string
 	remaining := height
 	for _, r := range rows {
 		// The block decides its own height: an empty variable (a task with
 		// no note) drops that template line instead of leaving a blank row,
 		// so two empty lines never appear between tiles.
-		block := taskLines(r, tiles, stale(r), r.id == o.Selected, cfg, pal, now, width)
+		block := taskLines(r, tiles, stale(r), r.id == o.Selected, cfg, pal, now, contentWidth)
 		if len(block) == 0 {
 			continue
+		}
+		if gutter > 0 {
+			bar := gutterBar(r, pal, gutter)
+			for i := range block {
+				block[i] = bar + block[i]
+			}
+		}
+		if r.id == o.Selected || isCurrentRow(r) {
+			for i := range block {
+				block[i] = rowBackground(block[i], pal.CurrentRowBg)
+			}
 		}
 		cost := len(block)
 		if len(lines) > 0 {
@@ -135,6 +154,49 @@ func blockLines(cfg *config.Config, rows []row, o Options, pal theme.Palette, no
 		remaining -= cost
 	}
 	return lines
+}
+
+// rowBackground paints a subtle band behind a whole row. The band is applied
+// after rendering and re-applied after every reset, because the template's own
+// style changes would otherwise punch holes in it.
+func rowBackground(line, hex string) string {
+	sgr := bgSGR(hex)
+	if sgr == "" {
+		return line
+	}
+	return sgr + strings.ReplaceAll(line, "\x1b[0m", "\x1b[0m"+sgr) + "\x1b[0m"
+}
+
+// bgSGR turns "#rrggbb" into a truecolor background escape. Anything else
+// (a named colour, an empty value) yields "" so the row renders unstyled.
+func bgSGR(hex string) string {
+	if len(hex) != 7 || hex[0] != '#' {
+		return ""
+	}
+	v, err := strconv.ParseUint(hex[1:], 16, 32)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("\x1b[48;2;%d;%d;%dm", v>>16&0xff, v>>8&0xff, v&0xff)
+}
+
+// gutterBar is the indicator column left of a tile: a bright bar for the
+// window the user is looking at, a dim one for every other row. It renders at
+// exactly n columns, so the tile content still ends at the pane edge.
+func gutterBar(r row, pal theme.Palette, n int) string {
+	colour := pal.Dimmed
+	if isCurrentRow(r) {
+		colour = pal.CurrentFg
+	}
+	if colour == "" {
+		colour = pal.Text
+	}
+	return format.Render("#[fg="+colour+"]▌#[default]", nil, pal, n)
+}
+
+// isCurrentRow reports whether this row belongs to the window in front.
+func isCurrentRow(r row) bool {
+	return r.pane != nil && r.pane.Active && r.pane.WindowActive
 }
 
 // taskLines renders one task through each template line, padded or truncated
@@ -162,8 +224,11 @@ func taskLines(r row, tpls []string, stale, selected bool, cfg *config.Config, p
 
 // rowVars builds the template variables for one task row.
 func rowVars(r row, selected bool, cfg *config.Config, pal theme.Palette, now int64) map[string]string {
+	// The reference sidebar highlights the row for the current window, not a
+	// cursor position, so the eye lands on what is in front of you.
+	current := isCurrentRow(r)
 	primary := r.title
-	if selected && pal.CurrentFg != "" {
+	if (selected || current) && pal.CurrentFg != "" {
 		primary = "#[fg=" + pal.CurrentFg + ",bold]" + r.title + "#[default]"
 	}
 	secondary := r.group
