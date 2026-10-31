@@ -8,6 +8,7 @@ import (
 	"github.com/AlienResidents/sideline/internal/config"
 	"github.com/AlienResidents/sideline/internal/format"
 	"github.com/AlienResidents/sideline/internal/model"
+	"github.com/AlienResidents/sideline/internal/theme"
 	"github.com/AlienResidents/sideline/internal/tmux"
 )
 
@@ -328,6 +329,46 @@ func TestHorizontalLayout(t *testing.T) {
 	}
 	if strings.Contains(plain, "{primary}") {
 		t.Errorf("tile template leaked into horizontal layout: %q", plain)
+	}
+}
+
+func TestShellRowTracksForegroundCommand(t *testing.T) {
+	cfg := testConfig()
+	cfg.Status["waiting"] = config.StatusStyle{Icon: "W", Colour: "#e0af68"}
+	pal := theme.Resolve(theme.Theme{
+		Scheme: cfg.Theme.Scheme,
+		Mode:   cfg.Theme.Mode,
+		Custom: cfg.Theme.Custom,
+	})
+	bind := &model.Binding{Kind: model.BindPane, PaneID: "%5"}
+	shellTask := model.Task{ID: "pane-5", Owner: model.OwnerShell, Title: "repo", Group: "repo", Bind: bind}
+	cases := []struct {
+		command string
+		text    string
+		status  string
+		icon    string
+	}{
+		{"bash", "bash", "waiting", "W"},
+		{"vim", "vim", "working", "w"},
+		{"claude", "claude", "working", "w"},
+	}
+	for _, c := range cases {
+		panes := []tmux.Pane{{PaneID: "%5", Command: c.command, Path: "/x/repo"}}
+		rows := roster(cfg, &model.State{Tasks: []model.Task{shellTask}}, panes, "")
+		if len(rows) != 1 {
+			t.Fatalf("%s: rows = %d", c.command, len(rows))
+		}
+		vars := rowVars(rows[0], false, cfg, pal, 0)
+		if vars["primary"] != c.text {
+			t.Errorf("%s: primary = %q, want %q", c.command, vars["primary"], c.text)
+		}
+		if vars["status"] != c.status {
+			t.Errorf("%s: status = %q, want %q", c.command, vars["status"], c.status)
+		}
+		// The icon carries its own colour markup; only the glyph matters.
+		if !strings.Contains(vars["status_icon"], c.icon) {
+			t.Errorf("%s: icon = %q, want %q", c.command, vars["status_icon"], c.icon)
+		}
 	}
 }
 

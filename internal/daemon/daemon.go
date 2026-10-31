@@ -374,8 +374,34 @@ func (d *Daemon) reconcile() {
 		d.reposition = false
 		return
 	}
+	if enabled {
+		d.syncPaneRows(panes)
+	}
 	for _, a := range plan(d.cfg, panes, enabled) {
 		d.apply(a)
+	}
+}
+
+// syncPaneRows keeps one row per bare pane. The tick already lists panes, so
+// this costs no extra process and no prompt latency: a shell window shows up
+// in the roster, and so does any harness that has no writer of its own.
+func (d *Daemon) syncPaneRows(panes []tmux.Pane) {
+	st := d.st.State()
+	if st == nil {
+		return
+	}
+	boot := d.client.ServerStart()
+	creates, clears := planPaneRows(panes, st.Tasks, boot)
+	for _, id := range clears {
+		if _, err := d.st.Apply(model.Request{Op: model.OpClear, ID: id}); err != nil {
+			return
+		}
+	}
+	for i := range creates {
+		task := creates[i]
+		if _, err := d.st.Apply(model.Request{Op: model.OpSet, Task: &task}); err != nil {
+			return
+		}
 	}
 }
 

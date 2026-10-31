@@ -23,6 +23,7 @@ type row struct {
 	activityTS int64
 	bind       *model.Binding
 	pane       *tmux.Pane
+	owner      string
 	declared   bool
 	order      int
 }
@@ -83,6 +84,19 @@ func buildRows(cfg *config.Config, state *model.State, panes []tmux.Pane) []row 
 	return rows
 }
 
+// shellCommands are the interactive shells a pane sits in at rest. A pane
+// running one of these is waiting for input rather than working.
+var shellCommands = map[string]bool{
+	"bash": true, "zsh": true, "sh": true, "dash": true, "fish": true,
+	"ksh": true, "mksh": true, "tcsh": true, "csh": true, "nu": true,
+	"xonsh": true,
+}
+
+// isShellCommand reports whether a pane's foreground process is a shell.
+func isShellCommand(command string) bool {
+	return shellCommands[strings.TrimPrefix(command, "-")]
+}
+
 // mergeState overlays one live state row onto a declaration. Non-empty state
 // fields win field by field; an empty status falls back to the declaration,
 // and a still-empty one to model.DefaultStatus in buildRows.
@@ -104,6 +118,9 @@ func mergeState(r *row, t *model.Task) {
 	}
 	if t.Bind != nil {
 		r.bind = t.Bind
+	}
+	if t.Owner != "" {
+		r.owner = t.Owner
 	}
 	r.activityTS = t.ActivityTS
 }

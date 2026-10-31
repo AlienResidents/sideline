@@ -288,6 +288,24 @@ in its runtime state without changing the declaration. Declarations are
 overridden field by field by state rows, so a `set --title` wins until the
 state row is cleared.
 
+### Pane rows
+
+Every pane that no other row binds gets one automatically, so a plain shell
+window is visible in the roster without any setup. The daemon already lists
+panes on its tick, so this costs no extra process and no prompt hook.
+
+- The row id is `pane-<n>`, from the pane id.
+- The first line shows the pane's live foreground command, not a stored
+  title: `bash` at a prompt, `vim` or `claude` while that runs.
+- The status is derived the same way. A shell at its prompt is `waiting` and
+  anything else in the pane is `working`. No writer has to report it, which is
+  what covers harnesses that have no integration of their own.
+- A pane row is deleted when its pane closes, when the tmux server changes, or
+  when a real writer claims the pane, such as the oh-my-pi extension reporting
+  its own task. The agent's row then keeps the pane in the roster.
+- `sideline clear pane-1` is undone on the next tick while the pane lives. To
+  keep a pane out of the roster, bind a row to it or turn the sidebar off.
+
 ## Commands
 
 | Command | Purpose |
@@ -361,6 +379,11 @@ each renderer pane, so a non-default directory works end to end.
 [`examples/omp/sideline-status.ts`](examples/omp/sideline-status.ts) is an
 oh-my-pi extension that reports the session status as a task. Copy it to
 `~/.omp/agent/extensions/`.
+
+A harness without an integration still appears, through a
+[pane row](#pane-rows): the row shows its live foreground command and reports
+`working` while it runs. The extension above adds what a pane cannot observe
+by itself, such as the session's title and its done state.
 
 The same pattern works for anything that can run a command:
 

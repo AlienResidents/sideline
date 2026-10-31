@@ -36,7 +36,15 @@ type Task struct {
 	Bind       *Binding          `json:"bind,omitempty"`
 	Note       string            `json:"note,omitempty"`
 	Meta       map[string]string `json:"meta,omitempty"`
+	// Owner is who maintains the row. Empty means a person or an agent wrote
+	// it and nobody else may remove it. OwnerShell marks a row the daemon
+	// keeps for a bare pane, which is deleted when the pane goes away or when
+	// a real writer claims the pane.
+	Owner string `json:"owner,omitempty"`
 }
+
+// OwnerShell marks a row the daemon created for a pane with no writer.
+const OwnerShell = "shell"
 
 // Binding kinds.
 const (

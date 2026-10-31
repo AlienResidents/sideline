@@ -227,9 +227,26 @@ func rowVars(r row, selected bool, cfg *config.Config, pal theme.Palette, now in
 	// The reference sidebar highlights the row for the current window, not a
 	// cursor position, so the eye lands on what is in front of you.
 	current := isCurrentRow(r)
-	primary := r.title
+	// A shell row tracks the pane's foreground process, so the row reads
+	// `vim` or `claude` without any writer having to notice. The stored title
+	// is the directory and stays as the fallback.
+	text := r.title
+	status := r.status
+	if r.owner == model.OwnerShell && r.pane != nil {
+		if r.pane.Command != "" {
+			text = r.pane.Command
+		}
+		// A shell sitting at its prompt is waiting for input. Anything else
+		// in the pane is work in progress.
+		if isShellCommand(r.pane.Command) {
+			status = "waiting"
+		} else {
+			status = "working"
+		}
+	}
+	primary := text
 	if (selected || current) && pal.CurrentFg != "" {
-		primary = "#[fg=" + pal.CurrentFg + ",bold]" + r.title + "#[default]"
+		primary = "#[fg=" + pal.CurrentFg + ",bold]" + text + "#[default]"
 	}
 	secondary := r.group
 	if r.group != "" && pal.Accent != "" {
@@ -253,8 +270,8 @@ func rowVars(r row, selected bool, cfg *config.Config, pal theme.Palette, now in
 		"secondary":    secondary,
 		"group":        r.group,
 		"note":         r.note,
-		"status":       r.status,
-		"status_icon":  statusIcon(r.status, cfg.Status, pal),
+		"status":       status,
+		"status_icon":  statusIcon(status, cfg.Status, pal),
 		"command_icon": commandIcon(r.pane, cfg.Icons, pal),
 		"agent_icon":   commandIcon(r.pane, cfg.Icons, pal),
 		"agent_label":  commandLabel(r.pane, cfg.Icons),
