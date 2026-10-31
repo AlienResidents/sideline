@@ -337,8 +337,9 @@ func TestLongTitleTruncated(t *testing.T) {
 	out := Frame(Options{Config: cfg, State: st, Width: 43, Height: 20})
 	checkPane(t, out, 43, 20)
 	first := strings.TrimRight(strings.Split(format.Strip(out), "\n")[0], " ")
-	if len(first) > 43 {
-		t.Errorf("title was not truncated: %d columns", len(first))
+	// Measure columns, not bytes: the gutter glyph is three bytes wide.
+	if w := format.VisibleWidth(first); w > 43 {
+		t.Errorf("title was not truncated: %d columns", w)
 	}
 }
 

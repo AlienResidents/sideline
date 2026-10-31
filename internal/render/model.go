@@ -75,10 +75,13 @@ type Model struct {
 
 	width, height int
 	selected      string
-	layout        string
-	filter        string
-	filtering     bool
-	now           int64
+	// userMoved records that a key moved the cursor. Until then the cursor
+	// follows the live window, so the band and the bar agree on one row.
+	userMoved bool
+	layout    string
+	filter    string
+	filtering bool
+	now       int64
 
 	// cfgPath and cfgMod let a theme edit repaint without restarting the
 	// pane: the config is re-read when the file's mtime moves.
@@ -128,6 +131,7 @@ func NewModel(o Options) tea.Model {
 	if ch, stop, err := store.Watch(store.StateFile()); err == nil {
 		m.stateCh, m.stopWatch = ch, stop
 	}
+	m.ensureSelection()
 	return m
 }
 
@@ -171,6 +175,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.panes = panes
 		}
 		m.reloadConfig(false)
+		m.ensureSelection()
 		// The state watch is re-armed from stateMsg, never from the tick:
 		// arming again here would leave one blocked reader per second.
 		return m, m.tick()
@@ -182,6 +187,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.reloadConfig(true)
 		}
 		m.state = msg.state
+		m.ensureSelection()
 		return m, waitForState(m.stateCh)
 	case tea.KeyMsg:
 		return m.handleKey(msg)
@@ -206,12 +212,16 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.jump()
 		}
 	case "up", "k":
+		m.userMoved = true
 		m.move(-1)
 	case "down", "j":
+		m.userMoved = true
 		m.move(1)
 	case "g":
+		m.userMoved = true
 		m.moveToFirst()
 	case "G":
+		m.userMoved = true
 		m.moveToLast()
 	case "v":
 		// Toggle between the two vertical layouts.
@@ -269,6 +279,35 @@ func (m *Model) move(delta int) {
 		i = len(ids) - 1
 	}
 	m.selected = ids[i]
+}
+
+// ensureSelection keeps the cursor on a real row: the first row at startup,
+// and the first row again when the selected task disappears after a state
+// change. Without this, Enter and the movement keys do nothing until the user
+// happens to press one.
+func (m *Model) ensureSelection() {
+	ids := m.visibleIDs()
+	if len(ids) == 0 {
+		m.selected = ""
+		return
+	}
+	if m.userMoved {
+		for _, id := range ids {
+			if id == m.selected {
+				return
+			}
+		}
+	} else {
+		// Following the live window keeps one row highlighted instead of
+		// the cursor and the current-window marker disagreeing.
+		for _, r := range m.rows() {
+			if isCurrentRow(r) {
+				m.selected = r.id
+				return
+			}
+		}
+	}
+	m.selected = ids[0]
 }
 
 func (m *Model) moveToFirst() {
