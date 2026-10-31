@@ -177,12 +177,14 @@ func LoadDefault() (*Config, error) {
 	return Load(p)
 }
 
+// boolPtr returns a pointer to v, for the tri-state config fields. It stays a
+// helper rather than new(v): go.mod declares Go 1.24, and new(expr) needs
+// 1.26, which would raise the build floor for no gain.
+func boolPtr(v bool) *bool { return &v }
+
 // Validate clamps loose values and rejects unknown ones. Unknown position or
 // layout is an error rather than a silent default because both decide where
 // and how the whole pane is drawn, and a typo would otherwise look like a bug.
-// boolPtr returns a pointer to v, for the tri-state config fields.
-func boolPtr(v bool) *bool { return &v }
-
 func (c *Config) Validate() error {
 	if c.Sidebar.AutoReload == nil {
 		c.Sidebar.AutoReload = boolPtr(true)

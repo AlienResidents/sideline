@@ -72,7 +72,9 @@ The field is a `*bool` so an absent key means on. A plain `bool` would make "not
 
 ## D17: Version is 0.1.0, stamped at build time
 
-The project is at major 0, so the minor and patch move on their own. The version lives in one place, `main.version`, and the Makefile passes the same value with `-X`; a plain `go build` keeps the source default. `sideline --version` prints it, and `sideline status` includes the daemon's version so a stale pane can be spotted against an installed binary.
+The project is at major 0, so the minor and patch move on their own. The version lives in exactly one place, `internal/version/VERSION`, and is embedded with `go:embed`. `make`, a plain `go build`, and `go install ...@latest` therefore all report the same string, and a release bumps one file. An earlier draft stamped it with `-X main.version` from the Makefile, which would have split from the source constant at the first tag bump.
+
+`sideline --version` prints it. `sideline status` prints the daemon's version and names a mismatch, so a daemon left over from an older install is visible as `note daemon is X, binary is Y; run sideline restart`.
 
 ## D18: The socket check is not the only single-instance guard
 

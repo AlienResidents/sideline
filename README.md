@@ -194,6 +194,10 @@ With `auto_reload` on, a changed config file is parsed and applied within a
 second or two. If the new file does not parse, the previous config stays in
 use, so a half-written theme never blanks the sidebar.
 
+The edit that sets `auto_reload: false` is itself applied immediately,
+because the running config still has it on. Only edits made after that are
+held until `sideline reload` or `sideline restart`.
+
 | Command | Effect |
 | --- | --- |
 | `sideline reload` | re-read the config now, even with `auto_reload: false`; rebuilds panes if `position` changed |

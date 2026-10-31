@@ -17,13 +17,9 @@ import (
 	"github.com/AlienResidents/sideline/internal/render"
 	"github.com/AlienResidents/sideline/internal/store"
 	"github.com/AlienResidents/sideline/internal/tmux"
+	sidelineversion "github.com/AlienResidents/sideline/internal/version"
 	"github.com/charmbracelet/bubbletea"
 )
-
-// version is stamped at build time with -X main.version. The Makefile passes
-// the same value, so a binary built by `make` and one built with `go build`
-// agree unless the flag is overridden.
-var version = "0.1.0"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -46,7 +42,7 @@ func run(cmd string, args []string) int {
 			fmt.Print(usage)
 			return 0
 		case "version", "--version", "-V":
-			fmt.Printf("sideline %s\n", version)
+			fmt.Printf("sideline %s\n", sidelineversion.Value)
 			return 0
 		default:
 			fmt.Fprintf(os.Stderr, "sideline: %q is not a sideline command\n\n%s", cmd, usage)
@@ -155,7 +151,7 @@ func cmdDaemon(args []string) error {
 		SocketPath: socketPath,
 		TmuxSocket: tmuxSocket,
 		RenderCmd:  render,
-		Version:    version,
+		Version:    sidelineversion.Value,
 	})
 	if err != nil {
 		return err
@@ -184,7 +180,7 @@ func cmdOff() error {
 // what the sidebar currently shows. --json emits the same as one object.
 func cmdStatus(args []string) error {
 	_, socketPath := paths(nil)
-	info := model.Info{Version: version}
+	info := model.Info{Version: sidelineversion.Value}
 	// Three outcomes, and they are not the same thing: no listener (stopped),
 	// a listener that rejects the op (a daemon from an older build), or a
 	// listener that answers.
@@ -240,6 +236,12 @@ func cmdStatus(args []string) error {
 	fmt.Printf("tasks      %d\n", info.Tasks)
 	if info.Running {
 		fmt.Printf("panes      %d\n", info.Panes)
+		if info.Version != "" && info.Version != sidelineversion.Value {
+			// A daemon from before the last install keeps drawing with old
+			// code; restart is the fix, so name it.
+			fmt.Printf("note       daemon is %s, binary is %s; run sideline restart\n",
+				info.Version, sidelineversion.Value)
+		}
 	}
 	return nil
 }
@@ -409,7 +411,11 @@ func startDaemon() error {
 	if err != nil {
 		return fmt.Errorf("locate sideline binary: %w", err)
 	}
-	args := []string{"daemon"}
+	// Pass the resolved paths rather than relying on environment
+	// inheritance: the child must bind the same socket the caller just
+	// checked, whatever its own environment resolution would produce.
+	statePath, socketPath := paths(nil)
+	args := []string{"daemon", "--state", statePath, "--socket", socketPath}
 	// A restart must talk to the same tmux server the old daemon did.
 	if s := os.Getenv("SIDELINE_TMUX_SOCKET"); s != "" {
 		args = append(args, "--tmux-socket", s)
@@ -428,7 +434,7 @@ func startDaemon() error {
 	// sidebar is coming up rather than merely that a fork happened.
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if daemon.Running(store.SocketPath()) {
+		if daemon.Running(socketPath) {
 			return nil
 		}
 		time.Sleep(50 * time.Millisecond)

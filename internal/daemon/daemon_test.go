@@ -177,6 +177,9 @@ func TestInfoReportsState(t *testing.T) {
 		SocketPath:  filepath.Join(dir, "s.sock"),
 		EnabledPath: filepath.Join(dir, "enabled"),
 		Version:     "1.2.3",
+		// A path with no server behind it: the test must never query the
+		// developer's live tmux server and count its panes.
+		TmuxSocket: filepath.Join(dir, "no-such-tmux"),
 	})
 	if err != nil {
 		t.Fatal(err)

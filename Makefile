@@ -1,6 +1,7 @@
 BINARY := sideline
-VERSION ?= 0.1.0
-LDFLAGS := -s -w -X main.version=$(VERSION)
+# The version lives in internal/version/VERSION and is embedded at compile
+# time, so every build path reports the same value.
+LDFLAGS := -s -w
 
 # Recommended install location. ~/.local/bin needs no root and is already on
 # PATH on most setups; override with `make install PREFIX=/usr/local/bin`.
