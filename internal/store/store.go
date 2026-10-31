@@ -278,7 +278,7 @@ func (s *Store) patch(id string, fields map[string]string, now int64) error {
 		t.Note = v
 	}
 	if v, ok := fields["bind_pane"]; ok {
-		t.Bind = &model.Binding{Kind: model.BindPane, PaneID: v}
+		t.Bind = &model.Binding{Kind: model.BindPane, PaneID: v, Boot: fields["bind_boot"]}
 	}
 	if v, ok := fields["bind_window"]; ok {
 		t.Bind = &model.Binding{Kind: model.BindWindow, Window: v}

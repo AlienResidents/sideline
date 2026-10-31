@@ -16,6 +16,7 @@ import (
 	"github.com/AlienResidents/sideline/internal/model"
 	"github.com/AlienResidents/sideline/internal/render"
 	"github.com/AlienResidents/sideline/internal/store"
+	"github.com/AlienResidents/sideline/internal/tmux"
 	"github.com/charmbracelet/bubbletea"
 )
 
@@ -182,6 +183,12 @@ func cmdSet(args []string) error {
 	id, fields, err := parseSetArgs(args)
 	if err != nil {
 		return err
+	}
+	// A pane id only means something inside one tmux server lifetime, so a
+	// pane binding carries the server's start time. Without it a row can
+	// point at whatever pane inherits the id after a restart.
+	if fields["bind_pane"] != "" {
+		fields["bind_boot"] = (tmux.Client{}).ServerStart()
 	}
 	req := model.Request{Op: model.OpSet, ID: id, Fields: fields}
 	if apply(req) {

@@ -139,6 +139,9 @@ func (d *Daemon) renderEnv() []string {
 	if d.cfgPath != "" {
 		env = append(env, "SIDELINE_CONFIG="+d.cfgPath)
 	}
+	if d.opts.TmuxSocket != "" {
+		env = append(env, "SIDELINE_TMUX_SOCKET="+d.opts.TmuxSocket)
+	}
 	return env
 }
 

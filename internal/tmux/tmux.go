@@ -167,6 +167,17 @@ func (p Pane) Target() string {
 	return p.Session + ":" + strconv.Itoa(p.WindowIndex)
 }
 
+// ServerStart returns the tmux server's start time as a string. Pane ids are
+// only unique within one server lifetime, so a binding records this value and
+// is dropped when the live server reports a different one.
+func (c Client) ServerStart() string {
+	out, err := c.run("display-message", "-p", "#{start_time}")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
+}
+
 // CurrentSession returns the session of the calling client.
 func (c Client) CurrentSession() (string, error) {
 	out, err := c.run("display-message", "-p", "#{session_name}")

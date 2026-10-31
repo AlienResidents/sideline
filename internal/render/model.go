@@ -13,6 +13,21 @@ import (
 	"github.com/charmbracelet/bubbletea"
 )
 
+// pruneBinds clears pane bindings that belong to a different tmux server
+// lifetime. Pane ids are reused after a restart, so a stale id can otherwise
+// send the cursor to an unrelated pane.
+func (m *Model) pruneBinds(st *model.State) {
+	if st == nil || m.boot == "" {
+		return
+	}
+	for i := range st.Tasks {
+		b := st.Tasks[i].Bind
+		if b != nil && b.Kind == model.BindPane && b.Boot != "" && b.Boot != m.boot {
+			st.Tasks[i].Bind = nil
+		}
+	}
+}
+
 // reloadConfig re-reads the config when the file changed. A broken edit keeps
 // the previous config so a half-written file does not blank the pane.
 func (m *Model) reloadConfig() {
@@ -65,6 +80,9 @@ type Model struct {
 	// pane: the config is re-read when the file's mtime moves.
 	cfgPath string
 	cfgMod  time.Time
+	// boot is the tmux server start time this renderer is attached to. A
+	// pane binding recorded against another server lifetime is dropped.
+	boot string
 }
 
 // NewModel builds the interactive model and starts the state watch. It never
@@ -75,9 +93,14 @@ func NewModel(o Options) tea.Model {
 		cfg = config.Default()
 	}
 	p, _ := config.Path()
+	// The pane may belong to a tmux server other than the default one; the
+	// daemon passes its socket through the pane environment.
+	client := tmux.Client{Socket: os.Getenv("SIDELINE_TMUX_SOCKET")}
 	m := &Model{
 		cfg:     cfg,
 		pal:     palette(cfg),
+		client:  client,
+		boot:    client.ServerStart(),
 		width:   o.Width,
 		height:  o.Height,
 		layout:  o.layout(cfg),
@@ -89,6 +112,7 @@ func NewModel(o Options) tea.Model {
 		m.cfgMod = fi.ModTime()
 	}
 	if st, err := store.Load(store.StateFile()); err == nil {
+		m.pruneBinds(st)
 		m.state = st
 	}
 	if ch, stop, err := store.Watch(store.StateFile()); err == nil {
@@ -141,6 +165,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// arming again here would leave one blocked reader per second.
 		return m, m.tick()
 	case stateMsg:
+		m.pruneBinds(msg.state)
 		m.state = msg.state
 		return m, waitForState(m.stateCh)
 	case tea.KeyMsg:

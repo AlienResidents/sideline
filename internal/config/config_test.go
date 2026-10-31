@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -51,6 +52,34 @@ func TestLoadMalformed(t *testing.T) {
 	}
 	if _, err := Load(p); err == nil {
 		t.Fatal("malformed yaml should error")
+	}
+}
+
+func TestExampleConfigLoads(t *testing.T) {
+	// The shipped example must parse under KnownFields; otherwise a new
+	// user's first copy fails and the project looks broken.
+	cfg, err := Load(filepath.Join("..", "..", "config.example.yaml"))
+	if err != nil {
+		t.Fatalf("example config: %v", err)
+	}
+	if len(cfg.Tasks) == 0 || cfg.Sidebar.Position != "left" {
+		t.Fatalf("example config parsed wrong: %+v", cfg.Sidebar)
+	}
+}
+
+func TestLoadUnknownKeyFails(t *testing.T) {
+	// A misspelled key must not be silently ignored: it looks like the
+	// setting works and does nothing.
+	p := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(p, []byte("sidebar:\n  postion: right\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load(p)
+	if err == nil {
+		t.Fatal("unknown key accepted")
+	}
+	if !strings.Contains(err.Error(), "postion") {
+		t.Fatalf("error does not name the key: %v", err)
 	}
 }
 

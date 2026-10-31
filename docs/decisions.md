@@ -24,7 +24,7 @@ One renderer pane per tmux window, placed before the content pane. This matches 
 
 ## D6: Placement is configurable
 
-`sidebar.position` takes `left`, `right`, `top`, `bottom`. Default `left`. `left` and `right` use `sidebar.width` and a horizontal split, `top` and `bottom` use `sidebar.height` and a vertical split. Top and bottom use the `horizontal` template set, because a tile body does not fit in eight rows.
+`sidebar.position` takes `left`, `right`, `top`, `bottom`. Default `left`. `left` and `right` use `sidebar.width` and a horizontal split, `top` and `bottom` use `sidebar.height` and a vertical split. Top and bottom use the `horizontal` template set, because a tile body does not fit in eight rows. A position change cannot be applied by resizing, so the daemon tears the panes down once and rebuilds them on the next tick.
 
 ## D7: The daemon never writes a pane title
 
@@ -36,15 +36,26 @@ No employer names, internal hostnames, ticket prefixes, or private URLs in code,
 
 ## D9: `set` patches, and patches upsert
 
-`sideline set <id> --status working` sends only the named fields. The store
-creates the row when it does not exist yet and defaults the title to the id.
-Reason: a status ping from an editor or an agent happens constantly, and a
-full-row replace would erase a title or note that the ping never mentioned.
-The store test asserts a status-only patch leaves the title intact.
+`sideline set <id> --status working` sends only the named fields. The store creates the row when it does not exist yet and defaults the title to the id. Reason: a status ping from an editor or an agent happens constantly, and a full-row replace would erase a title or note that the ping never mentioned. The store test asserts a status-only patch leaves the title intact.
 
 ## D10: The daemon passes resolved paths to the renderer
 
-A pane spawned by the tmux server does not inherit the daemon's environment,
-so a non-default state directory or config path would be invisible to the
-renderer. The daemon passes `SIDELINE_STATE_DIR` and `SIDELINE_CONFIG` to the
-pane with `split-window -e`, which sets them on that pane only.
+A pane spawned by the tmux server does not inherit the daemon's environment, so a non-default state directory or config path would be invisible to the renderer. The daemon passes `SIDELINE_STATE_DIR` and `SIDELINE_CONFIG` to the pane with `split-window -e`.
+
+Verified on tmux 3.8 that `-e` reaches the pane. Note that tmux also writes those values into the session environment, so later panes in that session inherit them. That is harmless here: only sideline reads those names, and a `sideline` command run from such a pane then talks to the same daemon.
+
+## D11: The renderer gets the tmux socket the same way
+
+A renderer that talks to the default server while the daemon runs against `--tmux-socket` lists the wrong panes. The daemon passes `SIDELINE_TMUX_SOCKET` through the pane environment and the renderer builds its client from it.
+
+## D12: A pane binding records the tmux server start time
+
+tmux pane ids (`%12`) are unique only within one server lifetime, so a row that stores one can point at an unrelated pane after a restart. A pane binding carries `boot`, read from `#{start_time}`, and the renderer drops a binding whose boot does not match the live server. Bindings written before this field existed are kept: dropping them would lose working rows on upgrade.
+
+## D13: Unknown config keys are an error
+
+`yaml.Decoder.KnownFields(true)`. A silently ignored `postion:` or `task:` reads as "the setting does nothing", which is the hardest config bug to find. A test loads `config.example.yaml` so the shipped example always parses.
+
+## D14: Linux is a build target, verified
+
+`GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build ./...` and the arm64 equivalent succeed, as does `GOOS=linux go vet ./...`. The only platform-sensitive calls are `syscall.Flock` and `syscall.SysProcAttr{Setsid: true}`, both present on Darwin and Linux.

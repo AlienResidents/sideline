@@ -48,6 +48,10 @@ type Binding struct {
 	Kind string `json:"kind"`
 	// PaneID is a tmux pane id such as "%12".
 	PaneID string `json:"pane_id,omitempty"`
+	// Boot is the tmux server start time the pane id belongs to. Pane ids
+	// are reused across server lifetimes, so a binding whose boot no longer
+	// matches the live server points at a different pane and is dropped.
+	Boot string `json:"boot,omitempty"`
 	// Window is "session:window_index".
 	Window string `json:"window,omitempty"`
 	// Target is a URL or command for BindExternal.

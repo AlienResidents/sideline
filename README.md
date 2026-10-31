@@ -67,9 +67,20 @@ set-hook -g session-created 'run-shell "sideline on"'
 ```
 
 Do not run two sidebar tools at once. If you are replacing another sidebar,
-remove its `session-created` hook first, or both will fight for pane space.
+turn it off first (`workmux sidebar off` for the reference tool) and remove
+its `session-created` hook, or both will fight for pane space.
+
+### Upgrading the binary
+
+A sidebar pane keeps the renderer process it started with. After replacing the
+binary, run `sideline off && sideline on` to rebuild the panes; until then the
+old renderer keeps drawing with the old code.
 
 ## Configuration
+
+Unknown keys are an error, not a silent no-op: a misspelled `postion:` fails
+to load with the line number. The shipped `config.example.yaml` is covered by
+a test, so it always parses.
 
 Config lives at `$SIDELINE_CONFIG`, else
 `$XDG_CONFIG_HOME/sideline/config.yaml`, else `~/.config/sideline/config.yaml`.

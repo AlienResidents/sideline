@@ -4,8 +4,10 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -125,7 +127,12 @@ func Load(path string) (*Config, error) {
 		}
 		return nil, fmt.Errorf("config: read %s: %w", path, err)
 	}
-	if err := yaml.Unmarshal(data, cfg); err != nil {
+	// KnownFields turns a misspelled key into an error with its line number.
+	// A silently ignored `postion:` or `task:` reads as "the setting does
+	// nothing", which is the hardest kind of config bug to find.
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(cfg); err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("config: parse %s: %w", path, err)
 	}
 	if err := cfg.Validate(); err != nil {
