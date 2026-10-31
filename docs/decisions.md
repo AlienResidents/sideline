@@ -102,6 +102,11 @@ extension never appeared. The daemon now keeps one row per unclaimed pane
 reads the pane's live foreground command and derives the status from it:
 `waiting` at a shell prompt, `working` otherwise.
 
+This qualifies D3 rather than reversing it. Rows are still tasks: a pane row
+is a task the daemon maintains on the user's behalf, marked with
+`owner: shell`, and it disappears with the pane. A row a person or an agent
+wrote still has no owner and still outlives its pane binding.
+
 The alternative, a `.bashrc` hook that binds the pane, was rejected: it forks
 a client on every prompt, and prompt-time writes still cannot follow a
 foreground command that changes without a prompt. The old tool needed a
@@ -111,8 +116,14 @@ one-second refresher per pane for exactly that reason.
 
 The five-second tick made a new window wait up to five seconds for its sidebar
 and a closed pane keep its row as long. `sideline poke` asks the daemon to
-reconcile immediately, and tmux hooks call it on new window, split, kill pane,
-pane exit and window unlink. Pokes coalesce, so a burst costs one pass.
+reconcile immediately, and tmux hooks call it:
+
+```
+after-new-window  after-split-window  after-kill-pane  pane-exited  window-unlinked
+```
+
+`kill-window` fires neither `after-kill-pane` nor `pane-exited`, which is why
+`window-unlinked` is in the list. Pokes coalesce, so a burst costs one pass.
 
 Measured on tmux 3.8: a pane row appears in 32 to 52 ms and a sidebar pane in
 52 to 83 ms, against a second or more on the tick alone. A typed `exit` adds
