@@ -291,7 +291,7 @@ status ping never erases a title.
 
 ```
 $ sideline status
-sideline 0.1.0
+sideline 0.0.1
 daemon     running, pid 4211, up 2h04m
 config     ~/.config/sideline/config.yaml
 state      ~/.local/state/sideline/state.json
@@ -352,6 +352,13 @@ make all && sideline set build --status done
 
 [`docs/decisions.md`](docs/decisions.md) records the settled choices and the
 evidence behind them.
+
+## Versioning
+
+The major stays 0 while the config keys, the CLI, and the state file can still
+change. `0.0.x` is pre-alpha and makes no compatibility promise. Bump the
+release by editing `internal/version/VERSION`; the value is embedded, so every
+build path reports it.
 
 ## Development
 

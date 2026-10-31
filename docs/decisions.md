@@ -70,9 +70,19 @@ The field is a `*bool` so an absent key means on. A plain `bool` would make "not
 
 `sideline reload` forces a config re-read even with `auto_reload: false`. The daemon reloads and bumps `State.ReloadSeq`; renderers watch the state file, so the bump is how a forced reload reaches a renderer that is not watching for mtime changes. `sideline restart` stops the daemon over the same socket, removes every sidebar pane, and starts a fresh daemon, which is the only way a newly installed binary takes effect inside existing panes.
 
-## D17: Version is 0.1.0, stamped at build time
+## D17: Version is 0.0.1, and the major stays 0 while the contract moves
 
-The project is at major 0, so the minor and patch move on their own. The version lives in exactly one place, `internal/version/VERSION`, and is embedded with `go:embed`. `make`, a plain `go build`, and `go install ...@latest` therefore all report the same string, and a release bumps one file. An earlier draft stamped it with `-X main.version` from the Makefile, which would have split from the source constant at the first tag bump.
+The version lives in exactly one place, `internal/version/VERSION`, and is embedded with `go:embed`. `make`, a plain `go build`, and `go install ...@latest` therefore all report the same string, and a release bumps one file. An earlier draft stamped it with `-X main.version` from the Makefile, which would have split from the source constant at the first tag bump.
+
+Version policy, since the tool is new and the config surface is still moving:
+
+| Range | Meaning |
+| --- | --- |
+| `0.0.x` | pre-alpha. Config keys, the CLI, and the state file may change without notice |
+| `0.x.y` | the command set and config keys are settling; breaking changes get a note |
+| `1.0.0` | config, CLI, and state file treated as a contract |
+
+The major stays 0 until those three are frozen.
 
 `sideline --version` prints it. `sideline status` prints the daemon's version and names a mismatch, so a daemon left over from an older install is visible as `note daemon is X, binary is Y; run sideline restart`.
 
