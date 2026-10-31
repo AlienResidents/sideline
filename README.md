@@ -33,22 +33,106 @@ shell hook ────┘      │
 The daemon never writes pane titles. Titles belong to the program in the pane,
 which is why a title does not get fought over every few seconds.
 
+## Requirements
+
+- macOS or Linux, amd64 or arm64.
+- tmux 3.0 or newer. The daemon uses `split-window -e` and pane options,
+  both added in tmux 3.0. Check with `tmux -V`.
+- Go 1.24 or newer, to build from source.
+
+`~/.local/bin` is the recommended install location: no root, no package
+manager, and the same path on macOS and Linux.
+
 ## Install
 
-Requires Go 1.24 or newer. macOS and Linux, amd64 and arm64.
+### macOS
 
 ```
-go build -o ~/.local/bin/sideline ./cmd/sideline
+brew install go tmux          # skip either that you already have
+git clone https://github.com/AlienResidents/sideline
+cd sideline
+make install                  # builds and copies to ~/.local/bin/sideline
 ```
 
-Or cross-compile every target the project supports:
+If `~/.local/bin` is not on your `PATH`, add it to `~/.zshrc` (the default
+shell on macOS) and open a new terminal:
+
+```
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+```
+
+Verify:
+
+```
+sideline --help
+```
+
+### Linux
+
+```
+# Go 1.24+ from your distribution, or from https://go.dev/dl/
+go version
+
+git clone https://github.com/AlienResidents/sideline
+cd sideline
+make install                  # builds and copies to ~/.local/bin/sideline
+```
+
+If `~/.local/bin` is not on your `PATH`, add it to `~/.profile` (login shells)
+or `~/.bashrc`, then open a new terminal:
+
+```
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
+```
+
+Verify:
+
+```
+sideline --help
+```
+
+Distributions shipping tmux older than 3.0 need a newer tmux first; the
+sidebar will not place panes without `split-window -e`.
+
+### Without cloning
+
+```
+go install github.com/AlienResidents/sideline/cmd/sideline@latest
+```
+
+That writes to `$(go env GOPATH)/bin`, usually `~/go/bin`. Add that directory
+to `PATH` if it is not there already.
+
+### Prebuilt binaries
 
 ```
 make build-all
 ```
 
-Put the binary on `PATH`. The daemon spawns the renderer by absolute path, so
-the tmux server does not need your shell `PATH`.
+`bin/` then holds `sideline-darwin-arm64`, `sideline-darwin-amd64`,
+`sideline-linux-arm64`, and `sideline-linux-amd64`. Copy the one you need to
+`~/.local/bin/sideline` and `chmod +x` it. This is the way to install on a
+machine without a Go toolchain.
+
+### System-wide install
+
+```
+sudo make install PREFIX=/usr/local/bin
+```
+
+### Upgrading
+
+```
+sideline off                  # stop the daemon and remove the panes
+cd sideline && git pull && make install
+sideline on                   # rebuild the panes with the new renderer
+```
+
+The `off`/`on` pair matters: a sidebar pane keeps the renderer process it
+started with, so existing panes would keep drawing with the old binary.
+
+The daemon spawns the renderer by absolute path, so the tmux server does not
+need your shell `PATH`.
 
 ## Quick start
 
