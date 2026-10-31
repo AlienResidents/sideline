@@ -128,14 +128,26 @@ to `PATH` if it is not there already.
 
 ### Prebuilt binaries
 
-```
-make build-all
+Every tag builds and publishes one release:
+<https://github.com/AlienResidents/sideline/releases/latest>. Each release
+carries `sideline_<version>_<os>_<arch>.tar.gz` for darwin and linux on amd64
+and arm64, plus `checksums.txt`. An archive holds `sideline`, `LICENSE` and
+`README.md`.
+
+```sh
+VERSION=1.0.0
+OS=$(uname -s | tr 'A-Z' 'a-z')
+ARCH=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+BASE="https://github.com/AlienResidents/sideline/releases/download/v${VERSION}"
+curl -fsSLO "${BASE}/sideline_${VERSION}_${OS}_${ARCH}.tar.gz"
+curl -fsSLO "${BASE}/checksums.txt"
+shasum -a 256 -c --ignore-missing checksums.txt
+tar -xzf "sideline_${VERSION}_${OS}_${ARCH}.tar.gz" -C ~/.local/bin sideline
 ```
 
-`bin/` then holds `sideline-darwin-arm64`, `sideline-darwin-amd64`,
-`sideline-linux-arm64`, and `sideline-linux-amd64`. Copy the one you need to
-`~/.local/bin/sideline` and `chmod +x` it. This is the way to install on a
-machine without a Go toolchain.
+To build the same four binaries yourself, `make build-all` writes
+`bin/sideline-<os>-<arch>`. `make dist` runs a local GoReleaser snapshot when
+GoReleaser is installed.
 
 ### System-wide install
 

@@ -7,7 +7,7 @@ LDFLAGS := -s -w
 # PATH on most setups; override with `make install PREFIX=/usr/local/bin`.
 PREFIX ?= $(HOME)/.local/bin
 
-.PHONY: build build-all install test lint clean
+.PHONY: build build-all install dist test lint clean
 
 build:
 	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/sideline
@@ -18,6 +18,12 @@ build-all:
 	GOOS=darwin  GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY)-darwin-amd64 ./cmd/sideline
 	GOOS=linux   GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY)-linux-arm64  ./cmd/sideline
 	GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY)-linux-amd64  ./cmd/sideline
+
+# Local dry run of the release: the same archives and checksums CI publishes,
+# written to dist/, with nothing uploaded. Needs goreleaser installed.
+dist:
+	command -v goreleaser || { echo "goreleaser is not installed"; exit 2; }
+	goreleaser release --snapshot --clean
 
 install: build
 	install -d "$(PREFIX)"

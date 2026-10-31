@@ -1,0 +1,58 @@
+# GoReleaser configuration for sideline.
+#
+# A tag push builds the matrix once, on one runner, and attaches the archives
+# and a checksum file to the GitHub release. Nothing is built on a laptop.
+#
+#   goreleaser check                      validate this file
+#   goreleaser build --snapshot --clean    build the matrix locally, no publish
+#
+# The version is embedded from internal/version/VERSION, so no -X ldflags are
+# needed and the tag cannot disagree with the reported version. The workflow
+# fails before building if it does.
+version: 2
+
+project_name: sideline
+
+builds:
+  - id: sideline
+    main: ./cmd/sideline
+    binary: sideline
+    # Pure Go: one runner cross-compiles every target. With cgo on, each
+    # target would need its own native runner and C toolchain.
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+
+archives:
+  - id: default
+    # sideline_1.0.0_darwin_arm64.tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+
+release:
+  draft: false
+  prerelease: auto

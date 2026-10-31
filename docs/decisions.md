@@ -173,3 +173,24 @@ disagree with what is on screen.
 Proved end to end on an isolated server: two windows, a click sent into the
 sidebar moved the session's current window from 0 to 1 and made the bound pane
 active.
+
+## D24: Releases are built from the tag by CI, never on a laptop
+
+A tag push is the only trigger. The workflow checks that the tag equals
+`internal/version/VERSION` before anything builds, so a release cannot ship a
+binary that reports a different version, then runs the tests and calls
+GoReleaser.
+
+GoReleaser cross-compiles the matrix from one Ubuntu runner because sideline is
+pure Go and the build sets `CGO_ENABLED=0`: darwin and linux on amd64 and
+arm64, four archives plus `checksums.txt`. With cgo each target would need its
+own native runner and C toolchain.
+
+Two config details were wrong on the first pass and only `goreleaser check`
+found them: the top-level key is `checksum`, not `checksums`, and
+`archives.format` is deprecated in v2 in favour of `formats`.
+
+Verified locally with GoReleaser 2.19.0: `check` reports a valid config, and
+`release --snapshot --clean` produced the four archives, each holding
+`sideline`, `LICENSE` and `README.md`. The extracted binary reports 1.0.0 and
+`shasum -a 256 -c checksums.txt` verifies all four.

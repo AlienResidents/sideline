@@ -1,0 +1,49 @@
+name: release
+
+# A release starts with a tag, and only with a tag. The workflow refuses to
+# publish when the tag and the embedded version disagree, so a release cannot
+# ship a binary that reports the wrong version.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check the tag matches internal/version/VERSION
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          want="$(tr -d '[:space:]' < internal/version/VERSION)"
+          printf 'tag %s / VERSION %s\n' "$tag" "$want"
+          if [ "$tag" != "$want" ]; then
+            printf 'refusing to release: tag %s does not match VERSION %s\n' "$tag" "$want" >&2
+            exit 1
+          fi
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build and publish
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
