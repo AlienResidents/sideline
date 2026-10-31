@@ -135,15 +135,34 @@ and arm64, plus `checksums.txt`. An archive holds `sideline`, `LICENSE` and
 `README.md`.
 
 ```sh
+set -eu
+# Set VERSION to the release you want, or resolve the latest with:
+#   VERSION=$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+#     https://github.com/AlienResidents/sideline/releases/latest | sed 's#.*/tag/v##')
 VERSION=1.0.1
+
 OS=$(uname -s | tr 'A-Z' 'a-z')
 ARCH=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+ARCHIVE="sideline_${VERSION}_${OS}_${ARCH}.tar.gz"
 BASE="https://github.com/AlienResidents/sideline/releases/download/v${VERSION}"
-curl -fsSLO "${BASE}/sideline_${VERSION}_${OS}_${ARCH}.tar.gz"
-curl -fsSLO "${BASE}/checksums.txt"
-shasum -a 256 -c --ignore-missing checksums.txt
-tar -xzf "sideline_${VERSION}_${OS}_${ARCH}.tar.gz" -C ~/.local/bin sideline
+
+tmp=$(mktemp -d)
+curl -fsSL -o "${tmp}/${ARCHIVE}" "${BASE}/${ARCHIVE}"
+curl -fsSL -o "${tmp}/checksums.txt" "${BASE}/checksums.txt"
+# Verify only the archive that was downloaded. A plain `shasum -c` would also
+# complain about the three archives that were not.
+( cd "${tmp}" && grep -F "  ${ARCHIVE}" checksums.txt | shasum -a 256 -c - ) || {
+  echo "checksum mismatch" >&2; exit 1; }
+
+mkdir -p ~/.local/bin
+tar -xzf "${tmp}/${ARCHIVE}" -C "${tmp}"
+install -m 0755 "${tmp}/sideline" ~/.local/bin/sideline
+rm -rf "${tmp}"
+~/.local/bin/sideline --version
 ```
+
+`sha256sum` replaces `shasum -a 256` on a system without Perl, and the
+verification line works with either.
 
 To build the same four binaries yourself, `make build-all` writes
 `bin/sideline-<os>-<arch>`. `make dist` runs a local GoReleaser snapshot when

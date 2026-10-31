@@ -190,6 +190,15 @@ Two config details were wrong on the first pass and only `goreleaser check`
 found them: the top-level key is `checksum`, not `checksums`, and
 `archives.format` is deprecated in v2 in favour of `formats`.
 
+The documented install path is part of the release. The README snippet was run
+verbatim against the published v1.0.1 assets with a fresh `HOME`: checksum OK,
+`~/.local/bin` created, binary reports 1.0.1. The failure paths were exercised
+too: a missing release stops at the first `curl` 404, and a one-byte change to
+an archive trips the checksum guard. Verification uses `grep -F ... | shasum -c -`
+rather than `shasum -c --ignore-missing`, because a plain `-c` fails on the
+archives that were not downloaded and the `--ignore-missing` flag is not
+portable.
+
 Verified locally with GoReleaser 2.19.0: `check` reports a valid config, and
 `release --snapshot --clean` produced the four archives, each holding
 `sideline`, `LICENSE` and `README.md`. The extracted binary reports 1.0.0 and
