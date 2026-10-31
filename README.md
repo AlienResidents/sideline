@@ -44,6 +44,7 @@ set-hook -g after-new-window   'run-shell -b "sideline poke"'
 set-hook -g after-split-window 'run-shell -b "sideline poke"'
 set-hook -g after-kill-pane    'run-shell -b "sideline poke"'
 set-hook -g pane-exited        'run-shell -b "sideline poke"'
+set-hook -g window-unlinked    'run-shell -b "sideline poke"'
 ```
 
 `sideline poke` exits 0 when no daemon is running, so the hooks are harmless
