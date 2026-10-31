@@ -236,6 +236,12 @@ brew trust AlienResidents/tap
 brew install --cask AlienResidents/tap/sideline
 ```
 
+End to end, on release v1.0.2: the cask was written to
+`AlienResidents/homebrew-tap/Casks/sideline.rb` by the release job, and
+`brew install --cask alienresidents/tap/sideline` on the Linux host produced
+`/home/linuxbrew/.linuxbrew/Caskroom/sideline/1.0.2` with `sideline 1.0.2` on
+PATH through Linuxbrew's bin.
+
 Publishing to `AlienResidents/homebrew-tap` needs a token with write access to
 that repository. `GITHUB_TOKEN` is scoped to this repository, so the workflow
 takes the tap token from `HOMEBREW_TAP_GITHUB_TOKEN` and, while that secret is
