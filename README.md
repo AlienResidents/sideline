@@ -396,8 +396,13 @@ because `select-pane` alone does not change the current window.
 
 Only presses act. Motion, releases, other buttons and clicks on the blank space
 between tiles do nothing, and the renderer asks tmux for cell-motion reporting
-only, so a held button does not repaint the roster. This needs `set -g mouse on`
-in tmux, which is the default in the shipped setup.
+only, so a held button does not repaint the roster.
+
+Clicks reach the renderer through tmux's mouse support, so `set -g mouse on`
+must be set. The renderer enables mouse reporting itself, which is what tmux
+needs to forward a click into the pane. If your `~/.tmux.conf` rebinds
+`MouseDown1Pane`, that binding has to forward the event with `send-keys -M`,
+otherwise the click stops at tmux.
 
 ## Files
 

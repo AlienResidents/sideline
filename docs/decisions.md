@@ -148,3 +148,28 @@ agent row outlived its pane: the sidebar showed `tmp-202` bound to a pane that
 no longer existed. The sweep now clears any row whose pane binding no longer
 resolves, and any binding that belongs to an older tmux server. A row with no
 pane binding is never swept: that is a task in its own right.
+
+## D23: A click selects the window, then the pane
+
+Two facts make click-to-switch work, and both would regress silently:
+
+1. `select-pane -t <id>` activates a pane inside its own window only. From
+   another window it exits 0 and changes nothing visible. Probed on an
+   isolated server: window 0 current, `select-pane -t %1` (a pane in window 1)
+   returned 0 and `#{window_index}` stayed 0; `select-window -t %1` moved it
+   to 1. `jump` therefore selects the window first, using the resolved pane's
+   `session:window_index`, and falls back to the pane id when the pane is not
+   in the list.
+2. The renderer must ask for mouse reporting (`tea.WithMouseCellMotion()`)
+   before tmux forwards clicks into the pane at all. With it, only presses are
+   acted on, so a held button does not repaint. Measured on the live pane:
+   `#{mouse_any_flag}` and `#{mouse_button_flag}` are both 1 for the renderer,
+   against 0 for a content pane beside it, so the request really reaches tmux.
+
+The hit test uses the line-to-row map produced by the same render pass that
+draws the frame, so clipped rows, blank separators and padding cannot
+disagree with what is on screen.
+
+Proved end to end on an isolated server: two windows, a click sent into the
+sidebar moved the session's current window from 0 to 1 and made the bound pane
+active.
