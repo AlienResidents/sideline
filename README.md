@@ -126,6 +126,18 @@ go install github.com/AlienResidents/sideline/cmd/sideline@latest
 That writes to `$(go env GOPATH)/bin`, usually `~/go/bin`. Add that directory
 to `PATH` if it is not there already.
 
+### Homebrew
+
+```sh
+brew trust alienresidents/tap
+brew install --cask alienresidents/tap/sideline
+```
+
+The cask lives in [`AlienResidents/homebrew-tap`](https://github.com/AlienResidents/homebrew-tap)
+and is written by the release job. The first line is required: Homebrew refuses
+to load a cask from a third-party tap until that tap is trusted. Homebrew on
+Linux behaves the same way. `brew untrust alienresidents/tap` reverses it.
+
 ### Prebuilt binaries
 
 Every tag builds and publishes one release:
@@ -139,7 +151,7 @@ set -eu
 # Set VERSION to the release you want, or resolve the latest with:
 #   VERSION=$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
 #     https://github.com/AlienResidents/sideline/releases/latest | sed 's#.*/tag/v##')
-VERSION=1.0.1
+VERSION=1.0.2
 
 OS=$(uname -s | tr 'A-Z' 'a-z')
 ARCH=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
@@ -387,7 +399,7 @@ status ping never erases a title.
 
 ```
 $ sideline status
-sideline 1.0.1
+sideline 1.0.2
 daemon     running, pid 4211, up 2h04m
 config     ~/.config/sideline/config.yaml
 state      ~/.local/state/sideline/state.json
