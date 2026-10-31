@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 
@@ -38,6 +39,8 @@ type Options struct {
 	TmuxSocket string
 	// RenderCmd is the command the sidebar pane runs.
 	RenderCmd string
+	// Version is reported by `sideline status`.
+	Version string
 }
 
 func (o Options) statePath() string {
@@ -73,6 +76,12 @@ func (o Options) renderCmd() string {
 // ErrRunning means a daemon is already answering on the socket.
 var ErrRunning = errors.New("sideline daemon already running")
 
+// PIDPath returns the daemon pid file next to the socket, so a test server on
+// another socket gets its own lock.
+func PIDPath(socketPath string) string {
+	return filepath.Join(filepath.Dir(socketPath), "daemon.pid")
+}
+
 // Daemon is one running daemon: the store, the socket server and the tmux
 // reconcile loop. Run blocks until a shutdown signal arrives.
 type Daemon struct {
@@ -92,6 +101,33 @@ type Daemon struct {
 	// and rebuilt on the following tick.
 	dir        tmux.Direction
 	reposition bool
+
+	// shutdown is closed when a client asks the daemon to stop, which is how
+	// `sideline restart` replaces the process without hunting its pid.
+	shutdown chan struct{}
+	stopOnce sync.Once
+
+	started time.Time
+}
+
+// stop asks Run to shut down. It is idempotent: two clients asking at once
+// must not close the channel twice.
+func (d *Daemon) stop() {
+	d.stopOnce.Do(func() { close(d.shutdown) })
+}
+
+// killPanes removes every sidebar pane this daemon placed. A restart uses it
+// so the next daemon does not adopt renderers from the previous build.
+func (d *Daemon) killPanes() {
+	panes, err := d.client.ListPanes()
+	if err != nil {
+		return
+	}
+	for _, p := range panes {
+		if p.Sidebar && p.PaneID != "" {
+			_ = d.client.KillPane(p.PaneID)
+		}
+	}
 }
 
 // New opens the state file and returns a daemon ready to Run.
@@ -119,12 +155,14 @@ func New(o Options) (*Daemon, error) {
 		dir = tmux.Left
 	}
 	d := &Daemon{
-		cfg:     cfg,
-		st:      st,
-		client:  tmux.Client{Socket: o.TmuxSocket},
-		opts:    o,
-		cfgPath: p,
-		dir:     dir,
+		cfg:      cfg,
+		st:       st,
+		client:   tmux.Client{Socket: o.TmuxSocket},
+		opts:     o,
+		cfgPath:  p,
+		dir:      dir,
+		shutdown: make(chan struct{}),
+		started:  time.Now(),
 	}
 	if fi, err := os.Stat(p); err == nil {
 		d.cfgMod = fi.ModTime()
@@ -147,20 +185,26 @@ func (d *Daemon) renderEnv() []string {
 
 // reload re-reads the config when the file changed since the last read. A
 // broken edit keeps the previous config: a syntax error while editing a theme
-// should not blank every sidebar.
-func (d *Daemon) reload() {
+// should not blank every sidebar. When force is false and
+// sidebar.auto_reload is off, a file change is ignored until someone runs
+// `sideline reload` or `sideline restart`.
+func (d *Daemon) reload(force bool) {
 	if d.cfgPath == "" {
+		return
+	}
+	if !force && !d.cfg.AutoReloadOn() {
 		return
 	}
 	fi, err := os.Stat(d.cfgPath)
 	if err != nil {
 		return
 	}
-	if fi.ModTime().Equal(d.cfgMod) {
+	if !force && fi.ModTime().Equal(d.cfgMod) {
 		return
 	}
 	cfg, err := config.Load(d.cfgPath)
 	if err != nil {
+		// Invalid config: keep drawing with the last good one.
 		return
 	}
 	d.cfg = cfg
@@ -197,6 +241,13 @@ func (d *Daemon) Run() error {
 	if Running(sock) {
 		return ErrRunning
 	}
+	// The lock covers the window between the socket check and the listener,
+	// which is where two `sideline on` calls can otherwise both bind.
+	pid, err := lockPID(PIDPath(sock))
+	if err != nil {
+		return err
+	}
+	defer pid.Close()
 	srv, err := ipc.Listen(sock, d.handle)
 	if err != nil {
 		return err
@@ -226,15 +277,45 @@ func (d *Daemon) Run() error {
 		case sig := <-sigs:
 			// SIGHUP is a reload request from a human, not a shutdown.
 			if sig == syscall.SIGHUP {
-				d.reload()
+				d.reload(true)
 				continue
 			}
+			return nil
+		case <-d.shutdown:
+			// Remove the panes so the next daemon starts from a clean
+			// window tree instead of adopting renderers from a dead build.
+			d.killPanes()
 			return nil
 		case err := <-done:
 			return err
 		case <-ticker.C:
 			d.reconcile()
 		}
+	}
+}
+
+// info reports the daemon's own state and its view of the world.
+func (d *Daemon) info() *model.Info {
+	enabled, _ := IsEnabled(d.opts.enabledPath())
+	panes := 0
+	if ps, err := d.client.ListPanes(); err == nil {
+		for _, p := range ps {
+			if p.Sidebar {
+				panes++
+			}
+		}
+	}
+	return &model.Info{
+		Running:    true,
+		Version:    d.opts.Version,
+		PID:        os.Getpid(),
+		UptimeS:    int64(time.Since(d.started).Seconds()),
+		ConfigPath: d.cfgPath,
+		StatePath:  d.opts.statePath(),
+		TmuxSocket: d.opts.TmuxSocket,
+		Enabled:    enabled,
+		Tasks:      len(d.st.State().Tasks),
+		Panes:      panes,
 	}
 }
 
@@ -246,7 +327,19 @@ func (d *Daemon) handle(req model.Request) model.Response {
 	case model.OpList:
 		return model.Response{OK: true, State: d.st.State()}
 	case model.OpReload:
-		d.reload()
+		d.reload(true)
+		// Renderers read the config themselves but only when auto_reload is
+		// on. Bumping the sequence tells them to re-read either way.
+		if err := d.st.BumpReload(); err != nil {
+			return model.Response{OK: false, Error: err.Error()}
+		}
+		return model.Response{OK: true}
+	case model.OpStatus:
+		return model.Response{OK: true, Info: d.info()}
+	case model.OpShutdown:
+		// Reply first: Run closes the socket on its way out, and the client
+		// must see OK before the connection drops.
+		go d.stop()
 		return model.Response{OK: true}
 	}
 	resp, err := d.st.Apply(req)
@@ -260,7 +353,7 @@ func (d *Daemon) handle(req model.Request) model.Response {
 // Errors are logged-shaped and dropped: a closing tmux server or a half
 // dead pane must never take the daemon down.
 func (d *Daemon) reconcile() {
-	d.reload()
+	d.reload(false)
 	enabled, err := IsEnabled(d.opts.enabledPath())
 	if err != nil {
 		return

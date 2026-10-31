@@ -24,6 +24,11 @@ sidebar:
   # Use Nerd Font glyphs in the status column.
   nerdfont: true
 
+  # Apply a changed config file as soon as it parses. An invalid edit is
+  # ignored and the last good config stays in use. Turn this off to require
+  # an explicit `sideline reload` or `sideline restart`.
+  auto_reload: true
+
   # Tmux-style templates. Directives are stateful until #[default].
   # Placeholders: {status_icon} {primary} {secondary} {title} {group}
   # {note} {status} {elapsed} {pane} {pane_title} {command} {window_index}

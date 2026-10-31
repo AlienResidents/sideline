@@ -101,6 +101,34 @@ Usage:
 Usage:
   sideline toggle
 `
+	usageStatus = `sideline status - show the daemon, paths and counts
+
+Prints the version, whether the daemon is running, the config and state
+paths, the tmux socket, the enabled flag, and the task and pane counts.
+The pane count needs a running daemon; without one the rest is still shown.
+
+Usage:
+  sideline status [--json]
+  sideline --version
+`
+	usageReload = `sideline reload - re-read the config
+
+Asks the running daemon to re-read its config file. Renderers watch that file
+themselves, so templates and colours repaint on their own; a position change
+makes the daemon rebuild the panes. Fails when no daemon is running.
+
+Usage:
+  sideline reload
+`
+	usageRestart = `sideline restart - replace the daemon and rebuild the panes
+
+Stops the running daemon, removes every sidebar pane and starts a fresh
+daemon. Use this after installing a new binary: a pane keeps the renderer
+process it started with, so only a rebuild picks up new code.
+
+Usage:
+  sideline restart
+`
 	usageSet = `sideline set - write one task row
 
 Creates or replaces the row with the given id. A set moves the row's activity
@@ -139,6 +167,9 @@ Commands:
   on        ensure the sidebar is running
   off       stop the sidebar
   toggle    flip the sidebar on or off
+  status    show the daemon, paths and counts
+  reload    re-read the config
+  restart   replace the daemon and rebuild the panes
   set       write a task row
   clear     remove a task row
   list      print the current task state
@@ -148,12 +179,15 @@ Run "sideline <command> --help" for command details.
 
 // commandUsage maps a subcommand name to its help text.
 var commandUsage = map[string]string{
-	"daemon": usageDaemon,
-	"render": usageRender,
-	"on":     usageOn,
-	"off":    usageOff,
-	"toggle": usageToggle,
-	"set":    usageSet,
-	"clear":  usageClear,
-	"list":   usageList,
+	"daemon":  usageDaemon,
+	"render":  usageRender,
+	"on":      usageOn,
+	"off":     usageOff,
+	"toggle":  usageToggle,
+	"status":  usageStatus,
+	"reload":  usageReload,
+	"restart": usageRestart,
+	"set":     usageSet,
+	"clear":   usageClear,
+	"list":    usageList,
 }

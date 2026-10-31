@@ -18,6 +18,10 @@ type State struct {
 	Version   int    `json:"version"`
 	UpdatedTS int64  `json:"updated_ts"`
 	Tasks     []Task `json:"tasks"`
+	// ReloadSeq is bumped by an explicit `sideline reload`. Renderers watch
+	// the state file, so this is how a forced config reload reaches them
+	// even when sidebar.auto_reload is off.
+	ReloadSeq int64 `json:"reload_seq,omitempty"`
 }
 
 // Task is one row in the sidebar. A task is not an agent: it exists because a
@@ -60,7 +64,7 @@ type Binding struct {
 
 // Request is one line of JSON sent to the daemon.
 type Request struct {
-	// Op is one of: set, clear, list, reload, ping.
+	// Op is one of: set, clear, list, reload, shutdown, status, ping.
 	Op string `json:"op"`
 	// Task is the full task to write for set. When set, it replaces the row
 	// with the same ID.
@@ -78,15 +82,32 @@ type Response struct {
 	OK    bool   `json:"ok"`
 	Error string `json:"error,omitempty"`
 	State *State `json:"state,omitempty"`
+	Info  *Info  `json:"info,omitempty"`
+}
+
+// Info is what the daemon reports about itself for `sideline status`.
+type Info struct {
+	Running    bool   `json:"running"`
+	Version    string `json:"version"`
+	PID        int    `json:"pid"`
+	UptimeS    int64  `json:"uptime_s"`
+	ConfigPath string `json:"config_path"`
+	StatePath  string `json:"state_path"`
+	TmuxSocket string `json:"tmux_socket,omitempty"`
+	Enabled    bool   `json:"enabled"`
+	Tasks      int    `json:"tasks"`
+	Panes      int    `json:"panes"`
 }
 
 // Request op names.
 const (
-	OpSet    = "set"
-	OpClear  = "clear"
-	OpList   = "list"
-	OpReload = "reload"
-	OpPing   = "ping"
+	OpSet      = "set"
+	OpClear    = "clear"
+	OpList     = "list"
+	OpReload   = "reload"
+	OpShutdown = "shutdown"
+	OpStatus   = "status"
+	OpPing     = "ping"
 )
 
 // Find returns the index of the task with id, or -1.

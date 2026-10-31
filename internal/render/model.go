@@ -28,14 +28,18 @@ func (m *Model) pruneBinds(st *model.State) {
 	}
 }
 
-// reloadConfig re-reads the config when the file changed. A broken edit keeps
-// the previous config so a half-written file does not blank the pane.
-func (m *Model) reloadConfig() {
+// reloadConfig re-reads the config when the file changed and auto_reload is
+// on, or unconditionally when force is set. A broken edit keeps the previous
+// config so a half-written file does not blank the pane.
+func (m *Model) reloadConfig(force bool) {
 	if m.cfgPath == "" {
 		return
 	}
+	if !force && !m.cfg.AutoReloadOn() {
+		return
+	}
 	fi, err := os.Stat(m.cfgPath)
-	if err != nil || fi.ModTime().Equal(m.cfgMod) {
+	if err != nil || (!force && fi.ModTime().Equal(m.cfgMod)) {
 		return
 	}
 	cfg, err := config.Load(m.cfgPath)
@@ -83,6 +87,11 @@ type Model struct {
 	// boot is the tmux server start time this renderer is attached to. A
 	// pane binding recorded against another server lifetime is dropped.
 	boot string
+
+	// reloadSeq mirrors State.ReloadSeq. A run of `sideline reload` bumps it,
+	// which is how an explicit reload reaches a renderer that has auto_reload
+	// switched off.
+	reloadSeq int64
 }
 
 // NewModel builds the interactive model and starts the state watch. It never
@@ -113,6 +122,7 @@ func NewModel(o Options) tea.Model {
 	}
 	if st, err := store.Load(store.StateFile()); err == nil {
 		m.pruneBinds(st)
+		m.reloadSeq = st.ReloadSeq
 		m.state = st
 	}
 	if ch, stop, err := store.Watch(store.StateFile()); err == nil {
@@ -160,12 +170,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if panes, err := m.client.ListPanes(); err == nil {
 			m.panes = panes
 		}
-		m.reloadConfig()
+		m.reloadConfig(false)
 		// The state watch is re-armed from stateMsg, never from the tick:
 		// arming again here would leave one blocked reader per second.
 		return m, m.tick()
 	case stateMsg:
 		m.pruneBinds(msg.state)
+		if msg.state != nil && msg.state.ReloadSeq != m.reloadSeq {
+			// An explicit reload applies even when auto_reload is off.
+			m.reloadSeq = msg.state.ReloadSeq
+			m.reloadConfig(true)
+		}
 		m.state = msg.state
 		return m, waitForState(m.stateCh)
 	case tea.KeyMsg:

@@ -225,6 +225,22 @@ func TestConcurrentApplyDistinctIDs(t *testing.T) {
 	}
 }
 
+func TestBumpReloadPersists(t *testing.T) {
+	s := newTestStore(t)
+	for want := int64(1); want <= 2; want++ {
+		if err := s.BumpReload(); err != nil {
+			t.Fatalf("bump: %v", err)
+		}
+		st, err := Load(s.Path())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if st.ReloadSeq != want {
+			t.Fatalf("reload_seq = %d, want %d", st.ReloadSeq, want)
+		}
+	}
+}
+
 func TestLoadMissingAndEmpty(t *testing.T) {
 	dir := t.TempDir()
 	st, err := Load(filepath.Join(dir, "absent.json"))

@@ -33,6 +33,15 @@ type Sidebar struct {
 	StaleAfter int       `yaml:"stale_after"`
 	Nerdfont   bool      `yaml:"nerdfont"`
 	Templates  Templates `yaml:"templates"`
+	// AutoReload applies a changed config file as soon as it parses. A
+	// pointer so an absent key means "on" rather than Go's false zero value.
+	AutoReload *bool `yaml:"auto_reload"`
+}
+
+// AutoReloadOn reports whether config changes apply without an explicit
+// reload. Absent means on.
+func (c *Config) AutoReloadOn() bool {
+	return c.Sidebar.AutoReload == nil || *c.Sidebar.AutoReload
 }
 
 // Templates are tmux-style format templates handed to internal/format.
@@ -98,6 +107,7 @@ func Default() *Config {
 			DimStale:   false,
 			StaleAfter: 3600,
 			Nerdfont:   true,
+			AutoReload: boolPtr(true),
 			Templates: Templates{
 				Compact: "{status_icon} {title} {fill} {elapsed}",
 				Tiles: []string{
@@ -170,7 +180,13 @@ func LoadDefault() (*Config, error) {
 // Validate clamps loose values and rejects unknown ones. Unknown position or
 // layout is an error rather than a silent default because both decide where
 // and how the whole pane is drawn, and a typo would otherwise look like a bug.
+// boolPtr returns a pointer to v, for the tri-state config fields.
+func boolPtr(v bool) *bool { return &v }
+
 func (c *Config) Validate() error {
+	if c.Sidebar.AutoReload == nil {
+		c.Sidebar.AutoReload = boolPtr(true)
+	}
 	switch c.Sidebar.Position {
 	case "left", "right", "top", "bottom":
 	case "":

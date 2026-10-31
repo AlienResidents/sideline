@@ -124,9 +124,8 @@ sudo make install PREFIX=/usr/local/bin
 ### Upgrading
 
 ```
-sideline off                  # stop the daemon and remove the panes
 cd sideline && git pull && make install
-sideline on                   # rebuild the panes with the new renderer
+sideline restart              # replace the daemon and rebuild the panes
 ```
 
 The `off`/`on` pair matters: a sidebar pane keeps the renderer process it
@@ -158,8 +157,8 @@ starting sideline, or both will fight for pane space.
 ### Upgrading the binary
 
 A sidebar pane keeps the renderer process it started with. After replacing the
-binary, run `sideline off && sideline on` to rebuild the panes; until then the
-old renderer keeps drawing with the old code.
+binary, run `sideline restart` to rebuild the panes; until then the old
+renderer keeps drawing with the old code.
 
 ## Configuration
 
@@ -183,6 +182,25 @@ sidebar:
 
 `top` and `bottom` use the `horizontal` template set, because a three-line
 tile does not fit in eight rows.
+
+### Reloading
+
+```yaml
+sidebar:
+  auto_reload: true    # default
+```
+
+With `auto_reload` on, a changed config file is parsed and applied within a
+second or two. If the new file does not parse, the previous config stays in
+use, so a half-written theme never blanks the sidebar.
+
+| Command | Effect |
+| --- | --- |
+| `sideline reload` | re-read the config now, even with `auto_reload: false`; rebuilds panes if `position` changed |
+| `sideline restart` | replace the daemon, remove the panes and rebuild them, which is how a new binary takes effect |
+
+`reload` never restarts renderers; they re-read the config when told to.
+`restart` does, because it replaces them.
 
 Changing `position` at runtime tears the panes down and rebuilds them on the
 new edge. Changing `width` or `height` resizes in place.
@@ -252,6 +270,9 @@ state row is cleared.
 | `sideline on` | set the enabled flag, start the daemon, place panes |
 | `sideline off` | clear the flag, remove every sidebar pane |
 | `sideline toggle` | flip the flag |
+| `sideline status` | version, daemon state, paths, counts |
+| `sideline reload` | re-read the config now |
+| `sideline restart` | replace the daemon and rebuild the panes |
 | `sideline daemon` | run the daemon in the foreground |
 | `sideline render` | run one renderer (the pane does this) |
 | `sideline set <id> [flags]` | create or patch one task |
@@ -261,6 +282,28 @@ state row is cleared.
 `set` flags: `--title`, `--status`, `--group`, `--note`, `--bind-pane`,
 `--bind-window`, `--bind-external`. Only the flags you pass are written, so a
 status ping never erases a title.
+
+### Status
+
+```
+$ sideline status
+sideline 0.1.0
+daemon     running, pid 4211, up 2h04m
+config     ~/.config/sideline/config.yaml
+state      ~/.local/state/sideline/state.json
+tmux       default socket
+enabled    yes
+tasks      3
+panes      2
+```
+
+`sideline status --json` prints the same as one object. `sideline --version`
+prints just the version. Without a running daemon the block still shows the
+paths, the enabled flag and the task count, and reports the daemon as stopped.
+
+A daemon from an older build answers the socket but rejects `status`; the
+block then says `running, older build` instead of claiming it is stopped.
+`sideline restart` fixes that by replacing the process.
 
 `set` and `clear` talk to the daemon when it is running and fall back to a
 flock-guarded direct write when it is not.
@@ -279,6 +322,7 @@ starts a new one on its next pass).
 | `$XDG_STATE_HOME/sideline/state.json` | task state, owned by the daemon |
 | `$XDG_STATE_HOME/sideline/sideline.sock` | client socket, mode 0600 |
 | `$XDG_STATE_HOME/sideline/enabled` | the on/off flag |
+| `$XDG_STATE_HOME/sideline/daemon.pid` | daemon pid, locked while it runs |
 
 `SIDELINE_STATE_DIR` moves all three. The daemon passes the resolved paths to
 each renderer pane, so a non-default directory works end to end.

@@ -1,6 +1,6 @@
 BINARY := sideline
-VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -s -w
+VERSION ?= 0.1.0
+LDFLAGS := -s -w -X main.version=$(VERSION)
 
 # Recommended install location. ~/.local/bin needs no root and is already on
 # PATH on most setups; override with `make install PREFIX=/usr/local/bin`.

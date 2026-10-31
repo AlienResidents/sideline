@@ -4,8 +4,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/AlienResidents/sideline/internal/config"
+	"github.com/AlienResidents/sideline/internal/model"
 	"github.com/AlienResidents/sideline/internal/tmux"
 )
 
@@ -133,6 +135,100 @@ func TestPlanVerticalUsesHeight(t *testing.T) {
 	if len(acts) != 1 || acts[0].Kind != ActionResize || acts[0].PaneID != "%2" || acts[0].Size != 8 {
 		t.Fatalf("want resize %%2 to 8 rows, got %+v", acts)
 	}
+}
+
+func TestPIDLockExcludesASecondDaemon(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "daemon.pid")
+	first, err := lockPID(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ReadPID(path); got != os.Getpid() {
+		t.Fatalf("pid file = %d, want %d", got, os.Getpid())
+	}
+	if _, err := lockPID(path); err == nil {
+		t.Fatal("second lock acquired")
+	} else if err != ErrRunning {
+		t.Fatalf("second lock error = %v, want ErrRunning", err)
+	}
+	// Releasing lets the next daemon in; a crash does the same through the
+	// OS, which is why a stale pid file is not a problem.
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	second, err := lockPID(path)
+	if err != nil {
+		t.Fatalf("lock after release: %v", err)
+	}
+	_ = second.Close()
+}
+
+func TestReadPIDMissing(t *testing.T) {
+	if got := ReadPID(filepath.Join(t.TempDir(), "nope.pid")); got != 0 {
+		t.Fatalf("ReadPID on a missing file = %d", got)
+	}
+}
+
+func TestInfoReportsState(t *testing.T) {
+	dir := t.TempDir()
+	d, err := New(Options{
+		Config:      testConfig(),
+		StatePath:   filepath.Join(dir, "state.json"),
+		SocketPath:  filepath.Join(dir, "s.sock"),
+		EnabledPath: filepath.Join(dir, "enabled"),
+		Version:     "1.2.3",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d.st.BumpReload(); err != nil {
+		t.Fatal(err)
+	}
+	info := d.info()
+	if !info.Running || info.Version != "1.2.3" {
+		t.Fatalf("info = %+v", info)
+	}
+	if info.PID == 0 || info.StatePath == "" || info.ConfigPath == "" {
+		t.Fatalf("info missing fields: %+v", info)
+	}
+	// No tmux server in a test, so the pane count is zero rather than an
+	// error, and the task count comes from the state file.
+	if info.Panes != 0 {
+		t.Fatalf("panes = %d", info.Panes)
+	}
+}
+
+func TestStopIsIdempotent(t *testing.T) {
+	// Two `sideline restart` calls racing must not close the channel twice,
+	// which would panic the daemon.
+	d := &Daemon{shutdown: make(chan struct{})}
+	d.stop()
+	d.stop()
+	select {
+	case <-d.shutdown:
+	default:
+		t.Fatal("shutdown channel not closed")
+	}
+}
+
+func TestShutdownOpAnswers(t *testing.T) {
+	d := &Daemon{shutdown: make(chan struct{})}
+	resp := d.handle(model.Request{Op: model.OpShutdown})
+	if !resp.OK {
+		t.Fatalf("shutdown response = %+v", resp)
+	}
+	// The stop is deferred to a goroutine so the reply reaches the client
+	// before the socket closes.
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		select {
+		case <-d.shutdown:
+			return
+		default:
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
+	t.Fatal("shutdown channel not closed")
 }
 
 func TestEnabledFlag(t *testing.T) {

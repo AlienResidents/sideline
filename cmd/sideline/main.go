@@ -20,6 +20,11 @@ import (
 	"github.com/charmbracelet/bubbletea"
 )
 
+// version is stamped at build time with -X main.version. The Makefile passes
+// the same value, so a binary built by `make` and one built with `go build`
+// agree unless the flag is overridden.
+var version = "0.1.0"
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprint(os.Stderr, usage)
@@ -39,6 +44,9 @@ func run(cmd string, args []string) int {
 		switch cmd {
 		case "help", "--help", "-h":
 			fmt.Print(usage)
+			return 0
+		case "version", "--version", "-V":
+			fmt.Printf("sideline %s\n", version)
 			return 0
 		default:
 			fmt.Fprintf(os.Stderr, "sideline: %q is not a sideline command\n\n%s", cmd, usage)
@@ -62,6 +70,12 @@ func run(cmd string, args []string) int {
 		err = cmdOff()
 	case "toggle":
 		err = cmdToggle()
+	case "status":
+		err = cmdStatus(args)
+	case "reload":
+		err = cmdReload()
+	case "restart":
+		err = cmdRestart()
 	case "set":
 		err = cmdSet(args)
 	case "clear":
@@ -141,6 +155,7 @@ func cmdDaemon(args []string) error {
 		SocketPath: socketPath,
 		TmuxSocket: tmuxSocket,
 		RenderCmd:  render,
+		Version:    version,
 	})
 	if err != nil {
 		return err
@@ -163,6 +178,129 @@ func cmdOn() error {
 // down on its next reconcile pass, so off never races tmux itself.
 func cmdOff() error {
 	return daemon.SetEnabled(enabledPath(), false)
+}
+
+// cmdStatus prints one block describing the daemon, the paths in use, and
+// what the sidebar currently shows. --json emits the same as one object.
+func cmdStatus(args []string) error {
+	_, socketPath := paths(nil)
+	info := model.Info{Version: version}
+	// Three outcomes, and they are not the same thing: no listener (stopped),
+	// a listener that rejects the op (a daemon from an older build), or a
+	// listener that answers.
+	var skew string
+	if resp, err := ipc.Send(socketPath, model.Request{Op: model.OpStatus}); err == nil {
+		switch {
+		case resp.OK && resp.Info != nil:
+			info = *resp.Info
+		default:
+			info.Running = true
+			skew = resp.Error
+		}
+	} else {
+		info.Running = false
+	}
+	if !info.Running || skew != "" {
+		if p, err := config.Path(); err == nil {
+			info.ConfigPath = p
+		}
+		info.StatePath = store.StateFile()
+		info.TmuxSocket = os.Getenv("SIDELINE_TMUX_SOCKET")
+		enabled, _ := daemon.IsEnabled(enabledPath())
+		info.Enabled = enabled
+		if st, err := store.Load(store.StateFile()); err == nil {
+			info.Tasks = len(st.Tasks)
+		}
+		info.PID = daemon.ReadPID(daemon.PIDPath(socketPath))
+	}
+
+	if hasFlag(args, "--json") {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(info)
+	}
+
+	fmt.Printf("sideline %s\n", info.Version)
+	switch {
+	case !info.Running:
+		fmt.Printf("daemon     stopped\n")
+	case skew != "":
+		fmt.Printf("daemon     running, pid %d, older build (%s)\n", info.PID, skew)
+	default:
+		fmt.Printf("daemon     running, pid %d, up %s\n", info.PID, humanDuration(info.UptimeS))
+	}
+	fmt.Printf("config     %s\n", info.ConfigPath)
+	fmt.Printf("state      %s\n", info.StatePath)
+	if info.TmuxSocket != "" {
+		fmt.Printf("tmux       %s\n", info.TmuxSocket)
+	} else {
+		fmt.Printf("tmux       default socket\n")
+	}
+	fmt.Printf("enabled    %s\n", yesNo(info.Enabled))
+	fmt.Printf("tasks      %d\n", info.Tasks)
+	if info.Running {
+		fmt.Printf("panes      %d\n", info.Panes)
+	}
+	return nil
+}
+
+// humanDuration renders seconds as "42s", "7m", or "3h04m".
+func humanDuration(s int64) string {
+	switch {
+	case s < 60:
+		return fmt.Sprintf("%ds", s)
+	case s < 3600:
+		return fmt.Sprintf("%dm", s/60)
+	default:
+		return fmt.Sprintf("%dh%02dm", s/3600, (s%3600)/60)
+	}
+}
+
+// hasFlag reports whether name appears in args.
+func hasFlag(args []string, name string) bool {
+	for _, a := range args {
+		if a == name {
+			return true
+		}
+	}
+	return false
+}
+
+func yesNo(v bool) string {
+	if v {
+		return "yes"
+	}
+	return "no"
+}
+
+// cmdReload asks a running daemon to re-read the config. Renderers watch the
+// config file themselves, so a changed palette or template repaints without a
+// restart; a placement change makes the daemon rebuild the panes.
+func cmdReload() error {
+	_, socketPath := paths(nil)
+	resp, err := ipc.Send(socketPath, model.Request{Op: model.OpReload})
+	if err != nil {
+		return fmt.Errorf("daemon not running: %w", err)
+	}
+	if !resp.OK {
+		return fmt.Errorf("%s", resp.Error)
+	}
+	return nil
+}
+
+// cmdRestart replaces the daemon process and rebuilds every sidebar pane.
+// This is the command to run after installing a new binary: a pane keeps the
+// renderer it started with, so only a rebuild picks up new code.
+func cmdRestart() error {
+	_, socketPath := paths(nil)
+	if _, err := ipc.Send(socketPath, model.Request{Op: model.OpShutdown}); err == nil {
+		deadline := time.Now().Add(3 * time.Second)
+		for time.Now().Before(deadline) && daemon.Running(socketPath) {
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
+	// The enabled flag lives on disk, so on restores the previous state.
+	return cmdOn()
 }
 
 // cmdToggle flips the flag.
@@ -271,7 +409,12 @@ func startDaemon() error {
 	if err != nil {
 		return fmt.Errorf("locate sideline binary: %w", err)
 	}
-	c := exec.Command(bin, "daemon")
+	args := []string{"daemon"}
+	// A restart must talk to the same tmux server the old daemon did.
+	if s := os.Getenv("SIDELINE_TMUX_SOCKET"); s != "" {
+		args = append(args, "--tmux-socket", s)
+	}
+	c := exec.Command(bin, args...)
 	c.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	// nil files give the child /dev/null: the daemon must not hold the
 	// caller's tty open, which would keep a terminal alive after `on`.

@@ -55,6 +55,38 @@ func TestLoadMalformed(t *testing.T) {
 	}
 }
 
+func TestAutoReloadDefaultOn(t *testing.T) {
+	if !Default().AutoReloadOn() {
+		t.Fatal("auto_reload must default to on")
+	}
+	// An absent key must not read as false through the bool zero value.
+	p := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(p, []byte("sidebar:\n  width: 50\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.AutoReloadOn() {
+		t.Fatal("absent auto_reload must stay on")
+	}
+}
+
+func TestAutoReloadCanBeTurnedOff(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(p, []byte("sidebar:\n  auto_reload: false\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.AutoReloadOn() {
+		t.Fatal("auto_reload: false ignored")
+	}
+}
+
 func TestExampleConfigLoads(t *testing.T) {
 	// The shipped example must parse under KnownFields; otherwise a new
 	// user's first copy fails and the project looks broken.

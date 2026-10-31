@@ -59,3 +59,21 @@ tmux pane ids (`%12`) are unique only within one server lifetime, so a row that 
 ## D14: Linux is a build target, verified
 
 `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build ./...` and the arm64 equivalent succeed, as does `GOOS=linux go vet ./...`. The only platform-sensitive calls are `syscall.Flock` and `syscall.SysProcAttr{Setsid: true}`, both present on Darwin and Linux.
+
+## D15: Auto-reload is on by default, and an invalid edit is ignored
+
+`sidebar.auto_reload` defaults to true: the daemon and every renderer watch the config file's mtime, parse a change, and apply it only when the parse succeeds. A half-written theme therefore never blanks the sidebar, and the previous config stays in use.
+
+The field is a `*bool` so an absent key means on. A plain `bool` would make "not mentioned" indistinguishable from "false".
+
+## D16: `reload` is explicit, `restart` replaces the renderers
+
+`sideline reload` forces a config re-read even with `auto_reload: false`. The daemon reloads and bumps `State.ReloadSeq`; renderers watch the state file, so the bump is how a forced reload reaches a renderer that is not watching for mtime changes. `sideline restart` stops the daemon over the same socket, removes every sidebar pane, and starts a fresh daemon, which is the only way a newly installed binary takes effect inside existing panes.
+
+## D17: Version is 0.1.0, stamped at build time
+
+The project is at major 0, so the minor and patch move on their own. The version lives in one place, `main.version`, and the Makefile passes the same value with `-X`; a plain `go build` keeps the source default. `sideline --version` prints it, and `sideline status` includes the daemon's version so a stale pane can be spotted against an installed binary.
+
+## D18: The socket check is not the only single-instance guard
+
+Two `sideline on` calls can both pass the "is anything listening" check before either binds, and unlinking a socket file lets a second daemon take the path from the first. The daemon therefore takes an exclusive `flock` on `daemon.pid` next to the socket before listening, and a second daemon exits with `ErrRunning`. The OS releases the lock on crash, so a stale pid file never blocks a restart. The pid file also gives `status` a pid to report.

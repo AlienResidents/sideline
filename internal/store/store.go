@@ -50,6 +50,26 @@ func (s *Store) Path() string {
 	return s.path
 }
 
+// BumpReload increments the reload counter and persists it. Renderers watch
+// the state file, so this is the signal that asks them to re-read the config.
+func (s *Store) BumpReload() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var bumpErr error
+	err := withFlock(s.lock, func() error {
+		if cur, err := load(s.path); err == nil {
+			s.state = cur
+		}
+		s.state.ReloadSeq++
+		bumpErr = save(s.path, s.state)
+		return bumpErr
+	})
+	if err != nil {
+		return err
+	}
+	return bumpErr
+}
+
 // State returns a deep copy of the current state.
 func (s *Store) State() *model.State {
 	s.mu.Lock()
