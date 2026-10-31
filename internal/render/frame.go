@@ -114,7 +114,14 @@ func blockLines(cfg *config.Config, rows []row, o Options, pal theme.Palette, no
 	var lines []string
 	remaining := height
 	for _, r := range rows {
-		cost := len(tiles)
+		// The block decides its own height: an empty variable (a task with
+		// no note) drops that template line instead of leaving a blank row,
+		// so two empty lines never appear between tiles.
+		block := taskLines(r, tiles, stale(r), r.id == o.Selected, cfg, pal, now, width)
+		if len(block) == 0 {
+			continue
+		}
+		cost := len(block)
 		if len(lines) > 0 {
 			cost++ // the blank separator line
 		}
@@ -124,7 +131,7 @@ func blockLines(cfg *config.Config, rows []row, o Options, pal theme.Palette, no
 		if len(lines) > 0 {
 			lines = append(lines, strings.Repeat(" ", width))
 		}
-		lines = append(lines, taskLines(r, tiles, stale(r), r.id == o.Selected, cfg, pal, now, width)...)
+		lines = append(lines, block...)
 		remaining -= cost
 	}
 	return lines
@@ -141,7 +148,14 @@ func taskLines(r row, tpls []string, stale, selected bool, cfg *config.Config, p
 			// directive is expanded into a real escape rather than shown.
 			tmpl = "#[fg=" + pal.Dimmed + "]" + tmpl + "#[default]"
 		}
-		lines = append(lines, format.Render(tmpl, rowVars(r, selected, cfg, pal, now), pal, width))
+		rendered := format.Render(tmpl, rowVars(r, selected, cfg, pal, now), pal, width)
+		// A template line that expands to nothing but padding carries no
+		// information; keeping it would space every tile as if it had a
+		// third line and push real content off the pane.
+		if strings.TrimSpace(format.Strip(rendered)) == "" {
+			continue
+		}
+		lines = append(lines, rendered)
 	}
 	return lines
 }

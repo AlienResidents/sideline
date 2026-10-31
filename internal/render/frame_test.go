@@ -84,19 +84,54 @@ func TestStateOverridesConfig(t *testing.T) {
 	}
 }
 
-// tileTitles extracts the first line of each tile block, which carries the
-// title, in display order.
+// tileTitles collects every non-blank rendered line. Tile height varies with
+// the content now (an empty variable drops its line), so stepping a fixed
+// stride would skip rows.
 func tileTitles(t *testing.T, out string) []string {
 	t.Helper()
 	var titles []string
-	lines := strings.Split(format.Strip(out), "\n")
-	for i := 0; i < len(lines); i += 4 {
-		title := strings.TrimRight(lines[i], " ")
-		if title != "" {
-			titles = append(titles, title)
+	for _, line := range strings.Split(format.Strip(out), "\n") {
+		line = strings.TrimRight(line, " ")
+		if line != "" {
+			titles = append(titles, line)
 		}
 	}
 	return titles
+}
+
+func TestTilesDropEmptyLines(t *testing.T) {
+	// A task with no note must not leave a blank third line plus the
+	// separator: two blank lines between tiles looked like a gap.
+	cfg := testConfig()
+	cfg.Sidebar.Templates.Tiles = []string{"{primary}", "{note}"}
+	st := &model.State{Tasks: []model.Task{
+		{ID: "a", Title: "First"},
+		{ID: "b", Title: "Second"},
+	}}
+	out := format.Strip(Frame(Options{Config: cfg, State: st, Width: 43, Height: 20}))
+	lines := strings.Split(out, "\n")
+	if strings.TrimSpace(lines[0]) != "First" {
+		t.Fatalf("line 0 = %q", lines[0])
+	}
+	if strings.TrimSpace(lines[1]) != "" {
+		t.Fatalf("expected the separator blank at line 1, got %q", lines[1])
+	}
+	if strings.TrimSpace(lines[2]) != "Second" {
+		t.Fatalf("line 2 = %q, want Second", lines[2])
+	}
+}
+
+func TestTilesKeepNoteLine(t *testing.T) {
+	cfg := testConfig()
+	cfg.Sidebar.Templates.Tiles = []string{"{primary}", "{note}"}
+	st := &model.State{Tasks: []model.Task{
+		{ID: "a", Title: "First", Note: "waiting on CI"},
+	}}
+	out := format.Strip(Frame(Options{Config: cfg, State: st, Width: 43, Height: 20}))
+	lines := strings.Split(out, "\n")
+	if strings.TrimSpace(lines[1]) != "waiting on CI" {
+		t.Fatalf("note line = %q", lines[1])
+	}
 }
 
 func TestSortActivity(t *testing.T) {
