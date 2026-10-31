@@ -36,8 +36,9 @@ which is why a title does not get fought over every few seconds.
 ## Requirements
 
 - macOS or Linux, amd64 or arm64.
-- tmux 3.0 or newer. The daemon uses `split-window -e` and pane options,
-  both added in tmux 3.0. Check with `tmux -V`.
+- tmux 3.0 or newer. The daemon uses `split-window -e` and pane options
+  (`set-option -p`, for the pane marker); both landed in the tmux 3.0 release
+  block, per tmux's `CHANGES`. Check with `tmux -V`. Tested on tmux 3.8.
 - Go 1.24 or newer, to build from source.
 
 `~/.local/bin` is the recommended install location: no root, no package
@@ -48,7 +49,7 @@ manager, and the same path on macOS and Linux.
 ### macOS
 
 ```
-brew install go tmux          # skip either that you already have
+brew install go tmux          # skip whichever you already have
 git clone https://github.com/AlienResidents/sideline
 cd sideline
 make install                  # builds and copies to ~/.local/bin/sideline
