@@ -1,6 +1,9 @@
 package tmux
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParsePane(t *testing.T) {
 	// One line exactly as list-panes emits it: unit separators, twelve
@@ -39,6 +42,35 @@ func TestPaneTarget(t *testing.T) {
 	p := Pane{Session: "main", WindowIndex: 3}
 	if got := p.Target(); got != "main:3" {
 		t.Fatalf("Target() = %q", got)
+	}
+}
+
+func TestSplitArgsKeepsFocus(t *testing.T) {
+	// -d is what stops the sidebar from taking focus when it is created.
+	for _, dir := range []Direction{Left, Right, Top, Bottom} {
+		args := splitArgs("main:0", dir, 43, "sideline render", nil)
+		found := false
+		for _, a := range args {
+			if a == "-d" {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("%v split args missing -d: %v", dir, args)
+		}
+		if args[len(args)-1] != "sideline render" {
+			t.Fatalf("command must be last: %v", args)
+		}
+	}
+}
+
+func TestSplitArgsCarriesEnv(t *testing.T) {
+	args := splitArgs("main:0", Left, 40, "sideline render",
+		[]string{"SIDELINE_STATE_DIR=/tmp/s", "SIDELINE_CONFIG=/tmp/c"})
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "-e SIDELINE_STATE_DIR=/tmp/s") ||
+		!strings.Contains(joined, "-e SIDELINE_CONFIG=/tmp/c") {
+		t.Fatalf("env missing from %v", args)
 	}
 }
 

@@ -193,6 +193,24 @@ func (c Client) CurrentSession() (string, error) {
 // and are set on the new pane only, so a non-default state dir or config path
 // reaches the renderer without touching the tmux server environment.
 func (c Client) SplitSidebar(target string, dir Direction, size int, cmd string, env []string) (string, error) {
+	out, err := c.run(splitArgs(target, dir, size, cmd, env)...)
+	if err != nil {
+		return "", err
+	}
+	id := strings.TrimSpace(out)
+	if err := c.SetPaneOption(id, roleOption, roleValue); err != nil {
+		return id, err
+	}
+	return id, nil
+}
+
+// splitArgs builds the tmux command that places a sidebar pane. It is pure so
+// the flags are testable.
+//
+// -d is load-bearing: without it tmux makes the new pane active, so creating
+// a sidebar would move the cursor out of the user's shell, and switching to
+// that window would land in the sidebar.
+func splitArgs(target string, dir Direction, size int, cmd string, env []string) []string {
 	flag := "-hb"
 	switch dir {
 	case Right:
@@ -202,20 +220,11 @@ func (c Client) SplitSidebar(target string, dir Direction, size int, cmd string,
 	case Bottom:
 		flag = "-v"
 	}
-	args := []string{"split-window", flag, "-l", strconv.Itoa(size), "-t", target}
+	args := []string{"split-window", flag, "-d", "-l", strconv.Itoa(size), "-t", target}
 	for _, kv := range env {
 		args = append(args, "-e", kv)
 	}
-	args = append(args, "-P", "-F", "#{pane_id}", cmd)
-	out, err := c.run(args...)
-	if err != nil {
-		return "", err
-	}
-	id := strings.TrimSpace(out)
-	if err := c.SetPaneOption(id, roleOption, roleValue); err != nil {
-		return id, err
-	}
-	return id, nil
+	return append(args, "-P", "-F", "#{pane_id}", cmd)
 }
 
 // SetPaneOption writes a pane-scoped tmux option.

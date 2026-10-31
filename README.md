@@ -314,6 +314,10 @@ flock-guarded direct write when it is not.
 
 ## Keyboard
 
+The sidebar never takes focus: panes are created detached, so switching to a
+window lands in the pane you left. The sidebar only receives keys when you
+move to it yourself (`ctrl+x` prefix then an arrow, or a click).
+
 Inside the sidebar pane: `j`/`k` or arrows move, `g`/`G` jump to the ends,
 `enter` focuses the bound pane or window, `v` toggles tiles and compact,
 `/` filters, `esc` clears the filter, `ctrl+c` exits the renderer (the daemon

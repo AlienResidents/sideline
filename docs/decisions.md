@@ -76,6 +76,10 @@ The project is at major 0, so the minor and patch move on their own. The version
 
 `sideline --version` prints it. `sideline status` prints the daemon's version and names a mismatch, so a daemon left over from an older install is visible as `note daemon is X, binary is Y; run sideline restart`.
 
+## D19: The sidebar never takes focus
+
+`split-window` makes the new pane active by default, so placing a sidebar would move the cursor out of the user's shell and every later switch into that window would land in the sidebar. The pane is created with `-d` (detached), which leaves the previous active pane in place. `splitArgs` is a pure function and a test asserts the flag is present for all four placements.
+
 ## D18: The socket check is not the only single-instance guard
 
 Two `sideline on` calls can both pass the "is anything listening" check before either binds, and unlinking a socket file lets a second daemon take the path from the first. The daemon therefore takes an exclusive `flock` on `daemon.pid` next to the socket before listening, and a second daemon exits with `ErrRunning`. The OS releases the lock on crash, so a stale pid file never blocks a restart. The pid file also gives `status` a pid to report.
