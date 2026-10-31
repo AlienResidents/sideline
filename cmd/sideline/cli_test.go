@@ -121,3 +121,23 @@ func TestPathsFlags(t *testing.T) {
 		t.Fatalf("state=%q socket=%q", state, socket)
 	}
 }
+
+func TestPathsHonourStateAndSocketFlags(t *testing.T) {
+	statePath, socketPath := paths([]string{"--state", "/tmp/state.json", "--socket", "/tmp/sock"})
+	if statePath != "/tmp/state.json" {
+		t.Errorf("state = %q", statePath)
+	}
+	if socketPath != "/tmp/sock" {
+		t.Errorf("socket = %q", socketPath)
+	}
+}
+
+func TestPathsFallBackToTheEnvironmentDefaults(t *testing.T) {
+	statePath, socketPath := paths(nil)
+	if statePath == "" || socketPath == "" {
+		t.Fatalf("paths = %q %q", statePath, socketPath)
+	}
+	if statePath == "/tmp/state.json" || socketPath == "/tmp/sock" {
+		t.Fatal("the flag values leaked into the defaults")
+	}
+}

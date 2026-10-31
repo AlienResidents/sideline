@@ -52,6 +52,14 @@ func palette(cfg *config.Config) theme.Palette {
 // Frame renders one complete pane-sized frame: exactly Height lines, each
 // exactly Width visible columns, so a repaint never leaves stale text.
 func Frame(o Options) string {
+	text, _ := FrameWithMap(o)
+	return text
+}
+
+// FrameWithMap renders the frame and reports which task row owns each line.
+// A line with no row, such as a blank separator or trailing padding, maps to
+// "". The renderer keeps that map so a mouse click can be turned into a row.
+func FrameWithMap(o Options) (string, []string) {
 	cfg := o.Config
 	if cfg == nil {
 		cfg = config.Default()
@@ -67,43 +75,50 @@ func Frame(o Options) string {
 		height = 0
 	}
 
-	var lines []string
+	var lines, ids []string
 	if len(rows) == 0 {
 		lines = append(lines, format.Render("#[fg=dimmed]no tasks#[default]", nil, pal, width))
+		ids = append(ids, "")
 	} else {
-		lines = append(lines, blockLines(cfg, rows, o, pal, now, width, height)...)
+		lines, ids = blockLines(cfg, rows, o, pal, now, width, height)
 		if len(lines) > height {
 			lines = lines[:height]
+			ids = ids[:height]
 		}
 	}
 	for len(lines) < height {
 		lines = append(lines, strings.Repeat(" ", width))
+		ids = append(ids, "")
 	}
-	return strings.Join(lines, "\n")
+	return strings.Join(lines, "\n"), ids
 }
 
 // blockLines renders the task blocks for one frame in the configured
 // orientation and layout.
-func blockLines(cfg *config.Config, rows []row, o Options, pal theme.Palette, now int64, width, height int) []string {
+func blockLines(cfg *config.Config, rows []row, o Options, pal theme.Palette, now int64, width, height int) ([]string, []string) {
 	stale := func(r row) bool {
 		return cfg.Sidebar.DimStale && now-r.activityTS > int64(cfg.Sidebar.StaleAfter)
 	}
 
 	if !cfg.IsVertical() {
 		// Top or bottom: one full-width block per task, no blank separator.
-		var lines []string
+		var lines, ids []string
 		for _, r := range rows {
-			lines = append(lines, taskLines(r, cfg.Sidebar.Templates.Horizontal, stale(r), r.id == o.Selected, cfg, pal, now, width)...)
+			block := taskLines(r, cfg.Sidebar.Templates.Horizontal, stale(r), r.id == o.Selected, cfg, pal, now, width)
+			lines = append(lines, block...)
+			ids = append(ids, repeatID(r.id, len(block))...)
 		}
-		return lines
+		return lines, ids
 	}
 
 	if o.layout(cfg) == "compact" {
-		var lines []string
+		var lines, ids []string
 		for _, r := range rows {
-			lines = append(lines, taskLines(r, []string{cfg.Sidebar.Templates.Compact}, stale(r), r.id == o.Selected, cfg, pal, now, width)...)
+			block := taskLines(r, []string{cfg.Sidebar.Templates.Compact}, stale(r), r.id == o.Selected, cfg, pal, now, width)
+			lines = append(lines, block...)
+			ids = append(ids, repeatID(r.id, len(block))...)
 		}
-		return lines
+		return lines, ids
 	}
 
 	// tiles: one block per task, a blank line between blocks, and a block
@@ -119,7 +134,7 @@ func blockLines(cfg *config.Config, rows []row, o Options, pal theme.Palette, no
 	}
 	contentWidth := width - gutter
 
-	var lines []string
+	var lines, ids []string
 	remaining := height
 	for _, r := range rows {
 		// The block decides its own height: an empty variable (a task with
@@ -149,11 +164,22 @@ func blockLines(cfg *config.Config, rows []row, o Options, pal theme.Palette, no
 		}
 		if len(lines) > 0 {
 			lines = append(lines, strings.Repeat(" ", width))
+			ids = append(ids, "")
 		}
 		lines = append(lines, block...)
+		ids = append(ids, repeatID(r.id, len(block))...)
 		remaining -= cost
 	}
-	return lines
+	return lines, ids
+}
+
+// repeatID is the per-line owner list for one task block.
+func repeatID(id string, n int) []string {
+	out := make([]string, n)
+	for i := range out {
+		out[i] = id
+	}
+	return out
 }
 
 // rowBackground paints a subtle band behind a whole row. The band is applied

@@ -107,7 +107,10 @@ func cmdRender() error {
 	}
 	m := render.NewModel(render.Options{Config: cfg})
 	// WindowSizeMsg sets the pane size, so no initial guess is needed.
-	if _, err := tea.NewProgram(m).Run(); err != nil {
+	// Cell motion turns on mouse reporting, so a click reaches the renderer
+	// as a mouse event instead of staying a tmux selection. Only presses are
+	// acted on, so a held button does not repaint the roster.
+	if _, err := tea.NewProgram(m, tea.WithMouseCellMotion()).Run(); err != nil {
 		return fmt.Errorf("render: %w", err)
 	}
 	return nil

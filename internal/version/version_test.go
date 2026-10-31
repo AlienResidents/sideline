@@ -23,9 +23,10 @@ func TestValueIsSemver(t *testing.T) {
 	}
 }
 
-func TestMajorIsZero(t *testing.T) {
-	// The major stays 0 while the config, CLI and state file can change.
-	if !strings.HasPrefix(Value, "0.") {
-		t.Fatalf("version %q left major 0 before the contract was frozen", Value)
+func TestValueIsPlainSemver(t *testing.T) {
+	// Release values are bare: a leading v or a pre-release suffix would
+	// break the comparison `sideline status` makes against the daemon.
+	if strings.HasPrefix(Value, "v") || strings.Contains(Value, "-") || strings.Contains(Value, "+") {
+		t.Fatalf("version %q is not a plain release value", Value)
 	}
 }

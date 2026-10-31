@@ -356,7 +356,7 @@ status ping never erases a title.
 
 ```
 $ sideline status
-sideline 0.0.1
+sideline 1.0.0
 daemon     running, pid 4211, up 2h04m
 config     ~/.config/sideline/config.yaml
 state      ~/.local/state/sideline/state.json
@@ -387,6 +387,17 @@ Inside the sidebar pane: `j`/`k` or arrows move, `g`/`G` jump to the ends,
 `enter` focuses the bound pane or window, `v` toggles tiles and compact,
 `/` filters, `esc` clears the filter, `ctrl+c` exits the renderer (the daemon
 starts a new one on its next pass).
+
+### Mouse
+
+A left click on a row selects it and switches to the bound window, then to its
+pane. Clicking a row in another window works: the window is selected first,
+because `select-pane` alone does not change the current window.
+
+Only presses act. Motion, releases, other buttons and clicks on the blank space
+between tiles do nothing, and the renderer asks tmux for cell-motion reporting
+only, so a held button does not repaint the roster. This needs `set -g mouse on`
+in tmux, which is the default in the shipped setup.
 
 ## Files
 
@@ -438,10 +449,10 @@ evidence behind them.
 
 ## Versioning
 
-The major stays 0 while the config keys, the CLI, and the state file can still
-change. `0.0.x` is pre-alpha and makes no compatibility promise. Bump the
-release by editing `internal/version/VERSION`; the value is embedded, so every
-build path reports it.
+From 1.0.0 the config keys, the CLI and the state file are a contract: a
+breaking change to any of them needs a major bump and a note in the release.
+Bump the release by editing `internal/version/VERSION`; the value is embedded,
+so every build path reports it.
 
 ## Development
 

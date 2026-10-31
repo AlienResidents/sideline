@@ -90,3 +90,32 @@ func TestPruneBindsNoServerIsNoop(t *testing.T) {
 		t.Fatal("pruned without a known server start")
 	}
 }
+
+func TestTickRefreshesPanesFromTmux(t *testing.T) {
+	m, cl := mouseFixture(t)
+	cl.panes = []tmux.Pane{{PaneID: "%9", Command: "vim"}}
+	next, cmd := m.Update(tickMsg{})
+	got := next.(*Model)
+	if len(got.panes) != 1 || got.panes[0].PaneID != "%9" {
+		t.Fatalf("panes after tick = %+v", got.panes)
+	}
+	// The next tick is scheduled from the tick itself.
+	if cmd == nil {
+		t.Fatal("tick did not schedule a follow-up")
+	}
+}
+
+func TestStateMessageReplacesTheRoster(t *testing.T) {
+	m, _ := mouseFixture(t)
+	m.selected = "second"
+	st := &model.State{Tasks: []model.Task{{ID: "first", Title: "First"}}}
+	next, _ := m.Update(stateMsg{state: st})
+	got := next.(*Model)
+	if got.state != st {
+		t.Fatal("state was not replaced")
+	}
+	// The selected row disappeared, so the cursor falls back to a live row.
+	if got.selected != "first" {
+		t.Fatalf("selection = %q, want first", got.selected)
+	}
+}

@@ -2,6 +2,7 @@ package render
 
 import (
 	"os"
+	"strconv"
 	"time"
 	"unicode/utf8"
 
@@ -62,10 +63,18 @@ type stateMsg struct {
 
 // Model is the interactive sidebar. It is read-only over the state file: it
 // watches and reloads, it never writes.
+// tmuxClient is the part of the tmux wrapper the renderer needs. It is an
+// interface so key and mouse handling can be tested without a live server.
+type tmuxClient interface {
+	ListPanes() ([]tmux.Pane, error)
+	SelectPane(paneID string) error
+	SelectWindow(target string) error
+}
+
 type Model struct {
 	cfg    *config.Config
 	pal    theme.Palette
-	client tmux.Client
+	client tmuxClient
 
 	state *model.State
 	panes []tmux.Pane
@@ -75,6 +84,9 @@ type Model struct {
 
 	width, height int
 	selected      string
+	// lineIDs maps a screen line of the last frame to the task row that owns
+	// it, so a click can be resolved to a row. "" means no row.
+	lineIDs []string
 	// userMoved records that a key moved the cursor. Until then the cursor
 	// follows the live window, so the band and the bar agree on one row.
 	userMoved bool
@@ -191,6 +203,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, waitForState(m.stateCh)
 	case tea.KeyMsg:
 		return m.handleKey(msg)
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
 	}
 	return m, nil
 }
@@ -322,6 +336,38 @@ func (m *Model) moveToLast() {
 	}
 }
 
+// handleMouse turns a left click into a selection and a jump. Other buttons,
+// motion and releases are ignored: the roster has no drag or hover behaviour.
+func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if msg.Action != tea.MouseActionPress || msg.Button != tea.MouseButtonLeft {
+		return m, nil
+	}
+	if msg.Y < 0 || msg.Y >= len(m.lineIDs) {
+		return m, nil
+	}
+	id := m.lineIDs[msg.Y]
+	if id == "" {
+		return m, nil
+	}
+	m.selected = id
+	m.userMoved = true
+	m.jump()
+	return m, nil
+}
+
+// paneWindowTarget names the window a bound pane lives in. The resolved pane
+// knows its session and window; without it the pane id is still a valid tmux
+// target for the window that contains it.
+func paneWindowTarget(r row) string {
+	if r.pane != nil {
+		return r.pane.Session + ":" + strconv.Itoa(r.pane.WindowIndex)
+	}
+	if r.bind != nil {
+		return r.bind.PaneID
+	}
+	return ""
+}
+
 // jump focuses whatever the selected task is bound to. Errors are races with
 // a closing pane or window, so they are ignored.
 func (m *Model) jump() {
@@ -331,6 +377,10 @@ func (m *Model) jump() {
 		}
 		switch r.bind.Kind {
 		case model.BindPane:
+			// select-pane only activates a pane inside its own window: from
+			// another window it succeeds and changes nothing visible. The
+			// window has to be selected first.
+			_ = m.client.SelectWindow(paneWindowTarget(r))
 			_ = m.client.SelectPane(r.bind.PaneID)
 		case model.BindWindow:
 			_ = m.client.SelectWindow(r.bind.Window)
@@ -346,7 +396,7 @@ func (m *Model) SelectedID() string {
 
 // View renders the current frame.
 func (m *Model) View() string {
-	return Frame(Options{
+	text, ids := FrameWithMap(Options{
 		Config:   m.cfg,
 		State:    m.state,
 		Panes:    m.panes,
@@ -356,4 +406,6 @@ func (m *Model) View() string {
 		Filter:   m.filter,
 		Layout:   m.layout,
 	})
+	m.lineIDs = ids
+	return text
 }
