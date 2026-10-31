@@ -1,35 +1,42 @@
 /**
  * sideline status reporting for oh-my-pi.
  *
- * Reports the session as a task row: `working` while the agent runs, `waiting`
- * when it hands control back, `done` when the turn ends. The row is bound to
- * the pane the session runs in, so `enter` in the sidebar jumps back here.
+ * Reports this session as a task in the sideline sidebar: `working` while the
+ * agent runs, `waiting` when it hands control back, `done` at the end of a
+ * turn. The row is bound to this pane, so Enter in the sidebar jumps back here.
  *
- * The task id is $SIDELINE_TASK_ID when set, otherwise the working directory
- * basename. Everything else about the row lives in the sideline state file.
+ * The task id is $SIDELINE_TASK_ID when set, otherwise "<dir>-<pane>", which
+ * keeps two sessions in the same directory from fighting over one row.
  *
- * Unlike a sidebar that owns pane titles, sideline never rewrites them, so
- * there is no title re-assert loop here: one write per status change is
- * enough.
- *
- * Copy to ~/.omp/agent/extensions/ and reload the session.
+ * This extension never touches the pane title: omp's own window status owns
+ * it, and sideline only reads it. That is why there is no re-assert loop.
  */
 
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { basename } from "node:path";
 
 export default function (pi: ExtensionAPI) {
+  const pane = process.env.TMUX_PANE;
+  // Outside tmux there is no pane to report against.
+  if (!pane) {
+    return;
+  }
+
   let lastStatus: string | undefined;
   let queue = Promise.resolve();
 
   function taskID(): string {
-    const fromEnv = process.env.SIDELINE_TASK_ID?.trim();
-    if (fromEnv) return fromEnv;
-    try {
-      return basename(process.cwd()) || "session";
-    } catch {
-      return "session";
+    const explicit = process.env.SIDELINE_TASK_ID?.trim();
+    if (explicit) {
+      return explicit;
     }
+    let dir = "session";
+    try {
+      dir = basename(process.cwd()) || "session";
+    } catch {
+      dir = "session";
+    }
+    return `${dir}-${pane.replace(/^%/, "")}`;
   }
 
   function sessionTitle(): string | undefined {
@@ -41,45 +48,17 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  // The pane title is what the sidebar shows in its pane column; the task
-  // title is what it shows in the roster. Keep both truthful.
   function write(status: string): Promise<void> {
-    const id = taskID();
-    const args = ["set", id, "--status", status];
-
+    const args = ["set", taskID(), "--status", status, "--bind-pane", pane];
     const title = sessionTitle();
     if (title) {
       args.push("--title", title);
     }
-    const pane = process.env.TMUX_PANE;
-    if (pane) {
-      args.push("--bind-pane", pane);
-    }
-
-    return pi
-      .exec("sideline", args)
-      .then(
-        () => setPaneTitle(status),
-        () => setPaneTitle(status),
-      )
-      .then(
-        () => {},
-        () => {},
-      );
-  }
-
-  function setPaneTitle(status: string): Promise<void> {
-    const pane = process.env.TMUX_PANE;
-    const title = sessionTitle();
-    if (!pane || !title) {
-      return Promise.resolve();
-    }
-    return pi
-      .exec("tmux", ["select-pane", "-t", pane, "-T", `${title} - ${status}`])
-      .then(
-        () => {},
-        () => {},
-      );
+    // A missing or stopped sideline must never break the session.
+    return pi.exec("sideline", args).then(
+      () => {},
+      () => {},
+    );
   }
 
   function setStatus(status: string): Promise<void> {
@@ -117,10 +96,6 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("agent_end", async () => {
-    if (lastStatus === "done") {
-      return;
-    }
-    lastStatus = "done";
-    await write("done");
+    await setStatus("done");
   });
 }
