@@ -463,7 +463,10 @@ each renderer pane, so a non-default directory works end to end.
 
 [`examples/omp/sideline-status.ts`](examples/omp/sideline-status.ts) is an
 oh-my-pi extension that reports the session status as a task. Copy it to
-`~/.omp/agent/extensions/`.
+`~/.omp/agent/extensions/`. It reports only from an attended session
+(`ctx.hasUI` true and not a subagent): a headless `omp -p` launched from a pane
+inherits `TMUX_PANE`, and an in-process subagent shares the parent's env, so
+without that gate both write rows bound to the parent's pane.
 
 A harness without an integration still appears, through a
 [pane row](#pane-rows): the row shows its live foreground command and reports

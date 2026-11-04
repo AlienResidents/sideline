@@ -10,10 +10,20 @@
  *
  * This extension never touches the pane title: omp's own window status owns
  * it, and sideline only reads it. That is why there is no re-assert loop.
+ *
+ * Only an attended session reports. A headless `omp -p` started from this
+ * pane (a smoke test run through a daemon) inherits TMUX_PANE, and an
+ * in-process task subagent shares this module's env. Without the gate both
+ * write rows bound to this pane: stray "<otherdir>-<pane>" rows that never
+ * clear, and a subagent's `done` overwriting the parent's own row.
  */
 
-import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { basename } from "node:path";
+
+function attended(ctx: ExtensionContext): boolean {
+  return ctx.hasUI === true && ctx.agent?.kind !== "sub";
+}
 
 export default function (pi: ExtensionAPI) {
   const pane = process.env.TMUX_PANE;
@@ -73,29 +83,35 @@ export default function (pi: ExtensionAPI) {
     return queue;
   }
 
-  pi.on("session_start", async () => {
+  pi.on("session_start", async (_event, ctx) => {
+    if (!attended(ctx)) return;
     await setStatus("waiting");
   });
 
-  pi.on("agent_start", async () => {
+  pi.on("agent_start", async (_event, ctx) => {
+    if (!attended(ctx)) return;
     await setStatus("working");
   });
 
-  pi.on("message_end", async (event) => {
+  pi.on("message_end", async (event, ctx) => {
+    if (!attended(ctx)) return;
     if ("role" in event.message && event.message.role === "assistant") {
       await setStatus("waiting");
     }
   });
 
-  pi.on("tool_call", async (event) => {
+  pi.on("tool_call", async (event, ctx) => {
+    if (!attended(ctx)) return;
     await setStatus(event.toolName === "ask" ? "waiting" : "working");
   });
 
-  pi.on("tool_execution_start", async () => {
+  pi.on("tool_execution_start", async (_event, ctx) => {
+    if (!attended(ctx)) return;
     await setStatus("working");
   });
 
-  pi.on("agent_end", async () => {
+  pi.on("agent_end", async (_event, ctx) => {
+    if (!attended(ctx)) return;
     await setStatus("done");
   });
 }
