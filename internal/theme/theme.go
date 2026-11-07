@@ -41,7 +41,7 @@ func darkPalette() Palette {
 		Danger:         "#f7768e",
 		Accent:         "#bb9af7",
 		CurrentFg:      "#7aa2f7",
-		CurrentRowBg:   "#1f2335",
+		CurrentRowBg:   "#33467c",
 		HighlightRowBg: "#292e42",
 	}
 }

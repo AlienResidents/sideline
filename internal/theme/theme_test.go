@@ -9,7 +9,7 @@ func TestBuiltinDark(t *testing.T) {
 		"HelpBorder": "#2f3549", "HelpMuted": "#565f89", "Header": "#bb9af7",
 		"Keycap": "#7dcfff", "Info": "#7aa2f7", "Success": "#9ece6a",
 		"Warning": "#e0af68", "Danger": "#f7768e", "Accent": "#bb9af7",
-		"CurrentFg": "#7aa2f7", "CurrentRowBg": "#1f2335", "HighlightRowBg": "#292e42",
+		"CurrentFg": "#7aa2f7", "CurrentRowBg": "#33467c", "HighlightRowBg": "#292e42",
 	}
 	got := map[string]string{
 		"Text": p.Text, "Dimmed": p.Dimmed, "Border": p.Border,

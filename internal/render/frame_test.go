@@ -172,8 +172,8 @@ func TestCurrentRowGetsBand(t *testing.T) {
 		{ID: "b", Title: "back", Note: "y", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%2"}},
 	}}
 	out := Frame(Options{Config: cfg, State: st, Panes: panes, Width: 43, Height: 20})
-	// #1f2335 is the default current_row_bg.
-	const band = "\x1b[48;2;31;35;53m"
+	// #33467c is the default current_row_bg.
+	const band = "\x1b[48;2;51;70;124m"
 	var front, back []string
 	for _, line := range strings.Split(out, "\n") {
 		if strings.Contains(line, "front") {

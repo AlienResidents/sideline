@@ -64,7 +64,7 @@ theme:
     danger: "#f7768e"
     accent: "#bb9af7"
     current_worktree_fg: "#7aa2f7"
-    current_row_bg: "#1f2335"
+    current_row_bg: "#33467c"
     highlight_row_bg: "#292e42"
 
 # Status vocabulary. Any string works. A status with no entry falls back to a
