@@ -248,3 +248,22 @@ takes the tap token from `HOMEBREW_TAP_GITHUB_TOKEN` and, while that secret is
 absent, runs GoReleaser with `--skip=homebrew`. Releases therefore keep
 shipping archives and checksums whether or not the tap is ready; `--skip=homebrew`
 was verified against a snapshot run.
+
+## D26: The background band marks only the selected row
+
+In the tiles layout, only the selected row gets the full-width background
+band. Active-pane gutter bars and title colours remain separate markers.
+Selection follows the live row until the user moves the cursor.
+
+Note on the earlier behaviour: the band also marked every current row.
+The selected row and a different current row could therefore both carry it.
+Rows may legitimately share a pane binding, so this change does not remove
+tasks or change the sweep rules in D22.
+
+Evidence: commit `8e42704` changes the band predicate in
+`internal/render/frame.go` to `r.id == o.Selected`. The command
+`go test ./internal/render ./internal/theme` passed. Regression tests cover
+a selected non-current row, an unselected current row, shared pane bindings,
+and preserved active-pane markers. A live `tmux capture-pane -p -e` capture
+after installation showed background escapes on exactly one three-line tile.
+Horizontal and compact layouts remain unchanged.
