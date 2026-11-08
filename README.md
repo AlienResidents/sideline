@@ -256,10 +256,11 @@ sidebar:
 ```
 
 A two-column indicator column sits left of every tile: a bright bar for the
-row of the window you are looking at, a dim one for the rest. The same live row
-gets a subtle background band across its full width, and its title takes the
-`current_worktree_fg` colour. That is the row-level "you are here" marker; the
-cursor selection adds the same treatment to whichever row you move onto.
+row of the window you are looking at, a dim one for the rest. The live row's
+title also takes the `current_worktree_fg` colour, so it stays findable
+without a highlight. The background band across the full row width belongs to
+the selected row alone: whichever row you move the cursor onto takes the band,
+and only that one.
 
 ### Reloading
 

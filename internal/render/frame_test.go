@@ -159,7 +159,12 @@ func TestGutterMarksCurrentRow(t *testing.T) {
 	}
 }
 
-func TestCurrentRowGetsBand(t *testing.T) {
+func TestOnlySelectedRowGetsBand(t *testing.T) {
+	// The full-width band belongs to the selected row alone. The band used
+	// to follow `selected OR current`, so moving the cursor off the live
+	// window banded two distinct rows, and two rows bound to the same pane
+	// banded together: either way the sidebar read as more highlighted rows
+	// than one.
 	cfg := testConfig()
 	cfg.Sidebar.Gutter = 0
 	cfg.Sidebar.Templates = config.Templates{Tiles: []string{"{primary}", "{note}"}}
@@ -168,28 +173,66 @@ func TestCurrentRowGetsBand(t *testing.T) {
 		{PaneID: "%2", Command: "omp", Active: true, WindowActive: false, Session: "s"},
 	}
 	st := &model.State{Tasks: []model.Task{
-		{ID: "a", Title: "front", Note: "x", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%1"}},
-		{ID: "b", Title: "back", Note: "y", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%2"}},
+		// Selected, and its pane is not the one in front.
+		{ID: "a", Title: "chosen", Note: "x", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%2"}},
+		// The live row, on its own pane, left unselected.
+		{ID: "b", Title: "front", Note: "y", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%1"}},
+		// A second row on the same live pane.
+		{ID: "c", Title: "sibling", Note: "z", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%1"}},
 	}}
-	out := Frame(Options{Config: cfg, State: st, Panes: panes, Width: 43, Height: 20})
+	out := Frame(Options{Config: cfg, State: st, Panes: panes, Selected: "a", Width: 43, Height: 20})
 	// #33467c is the default current_row_bg.
 	const band = "\x1b[48;2;51;70;124m"
-	var front, back []string
+	var chosen, other []string
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "chosen") {
+			chosen = append(chosen, line)
+		}
+		if strings.Contains(line, "front") || strings.Contains(line, "sibling") {
+			other = append(other, line)
+		}
+	}
+	if len(chosen) == 0 || !strings.Contains(chosen[0], band) {
+		t.Fatalf("selected row has no background band: %q", chosen)
+	}
+	for _, line := range other {
+		if strings.Contains(line, band) {
+			t.Fatalf("unselected row carries the band: %q", line)
+		}
+	}
+}
+
+func TestUnselectedCurrentRowKeepsMarkers(t *testing.T) {
+	// Losing the band must not cost the live row its own markers: the
+	// bright gutter bar and the current_worktree_fg title stay, so the row
+	// of the window in front is still findable without it.
+	cfg := testConfig()
+	cfg.Sidebar.Gutter = 2
+	cfg.Sidebar.Templates = config.Templates{Tiles: []string{"{primary}"}}
+	panes := []tmux.Pane{
+		{PaneID: "%1", Command: "omp", Active: true, WindowActive: true, Session: "s"},
+		{PaneID: "%2", Command: "omp", Active: true, WindowActive: false, Session: "s"},
+	}
+	st := &model.State{Tasks: []model.Task{
+		{ID: "a", Title: "chosen", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%2"}},
+		{ID: "b", Title: "front", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%1"}},
+	}}
+	out := Frame(Options{Config: cfg, State: st, Panes: panes, Selected: "a", Width: 43, Height: 20})
+	const band = "\x1b[48;2;51;70;124m"
+	// #7aa2f7 is the default current_worktree_fg, used by the bright
+	// gutter bar and the live row title.
+	const current = "\x1b[38;2;122;162;247m"
+	var front []string
 	for _, line := range strings.Split(out, "\n") {
 		if strings.Contains(line, "front") {
 			front = append(front, line)
 		}
-		if strings.Contains(line, "back") {
-			back = append(back, line)
-		}
 	}
-	if len(front) == 0 || !strings.Contains(front[0], band) {
-		t.Fatalf("live row has no background band: %q", front)
+	if len(front) == 0 || !strings.Contains(front[0], current) {
+		t.Fatalf("live row lost its gutter/title colour: %q", front)
 	}
-	for _, line := range back {
-		if strings.Contains(line, band) {
-			t.Fatalf("inactive row carries the band: %q", line)
-		}
+	if strings.Contains(front[0], band) {
+		t.Fatalf("unselected live row carries the band: %q", front)
 	}
 }
 

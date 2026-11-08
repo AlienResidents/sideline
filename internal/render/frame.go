@@ -150,7 +150,11 @@ func blockLines(cfg *config.Config, rows []row, o Options, pal theme.Palette, no
 				block[i] = bar + block[i]
 			}
 		}
-		if r.id == o.Selected || isCurrentRow(r) {
+		// Only the selected row takes the full-width band. Several rows can
+		// share the live pane, and banding every one of them made the
+		// highlight read as more rows than one. The live pane keeps its own
+		// markers: the gutter bar and the current_worktree_fg title.
+		if r.id == o.Selected {
 			for i := range block {
 				block[i] = rowBackground(block[i], pal.CurrentRowBg)
 			}
