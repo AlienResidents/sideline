@@ -219,9 +219,10 @@ func TestUnselectedCurrentRowKeepsMarkers(t *testing.T) {
 	}}
 	out := Frame(Options{Config: cfg, State: st, Panes: panes, Selected: "a", Width: 43, Height: 20})
 	const band = "\x1b[48;2;51;70;124m"
-	// #7aa2f7 is the default current_worktree_fg, used by the bright
-	// gutter bar and the live row title.
-	const current = "\x1b[38;2;122;162;247m"
+	// #7aa2f7 is the default current_worktree_fg (live row title), and
+	// #bb9af7 is the default gutter_fg (bright gutter bar).
+	const current = "\x1b[38;2;122;162;247;1m"
+	const gutter = "\x1b[38;2;187;154;247m"
 	var front []string
 	for _, line := range strings.Split(out, "\n") {
 		if strings.Contains(line, "front") {
@@ -230,6 +231,9 @@ func TestUnselectedCurrentRowKeepsMarkers(t *testing.T) {
 	}
 	if len(front) == 0 || !strings.Contains(front[0], current) {
 		t.Fatalf("live row lost its gutter/title colour: %q", front)
+	}
+	if !strings.Contains(front[0], gutter) {
+		t.Fatalf("live row lost its gutter colour: %q", front)
 	}
 	if strings.Contains(front[0], band) {
 		t.Fatalf("unselected live row carries the band: %q", front)

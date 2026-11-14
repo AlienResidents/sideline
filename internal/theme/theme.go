@@ -22,6 +22,7 @@ type Palette struct {
 	CurrentFg      string
 	CurrentRowBg   string
 	HighlightRowBg string
+	GutterFg       string
 }
 
 // darkPalette is the default ground: a Tokyo Night style tint tuned for a
@@ -43,6 +44,7 @@ func darkPalette() Palette {
 		CurrentFg:      "#7aa2f7",
 		CurrentRowBg:   "#33467c",
 		HighlightRowBg: "#292e42",
+		GutterFg:       "#bb9af7",
 	}
 }
 
@@ -64,6 +66,7 @@ func lightPalette() Palette {
 		CurrentFg:      "#0969da",
 		CurrentRowBg:   "#eaeef2",
 		HighlightRowBg: "#f0f3f6",
+		GutterFg:       "#8250df",
 	}
 }
 
@@ -121,6 +124,7 @@ func Resolve(t Theme) Palette {
 	set(&p.CurrentFg, "current_worktree_fg")
 	set(&p.CurrentRowBg, "current_row_bg")
 	set(&p.HighlightRowBg, "highlight_row_bg")
+	set(&p.GutterFg, "gutter_fg")
 	return p
 }
 

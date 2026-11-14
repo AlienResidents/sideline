@@ -217,7 +217,7 @@ func bgSGR(hex string) string {
 func gutterBar(r row, pal theme.Palette, n int) string {
 	colour := pal.Dimmed
 	if isCurrentRow(r) {
-		colour = pal.CurrentFg
+		colour = pal.GutterFg
 	}
 	if colour == "" {
 		colour = pal.Text

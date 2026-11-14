@@ -9,14 +9,14 @@ func TestBuiltinDark(t *testing.T) {
 		"HelpBorder": "#2f3549", "HelpMuted": "#565f89", "Header": "#bb9af7",
 		"Keycap": "#7dcfff", "Info": "#7aa2f7", "Success": "#9ece6a",
 		"Warning": "#e0af68", "Danger": "#f7768e", "Accent": "#bb9af7",
-		"CurrentFg": "#7aa2f7", "CurrentRowBg": "#33467c", "HighlightRowBg": "#292e42",
+		"CurrentFg": "#7aa2f7", "CurrentRowBg": "#33467c", "HighlightRowBg": "#292e42", "GutterFg": "#bb9af7",
 	}
 	got := map[string]string{
 		"Text": p.Text, "Dimmed": p.Dimmed, "Border": p.Border,
 		"HelpBorder": p.HelpBorder, "HelpMuted": p.HelpMuted, "Header": p.Header,
 		"Keycap": p.Keycap, "Info": p.Info, "Success": p.Success,
 		"Warning": p.Warning, "Danger": p.Danger, "Accent": p.Accent,
-		"CurrentFg": p.CurrentFg, "CurrentRowBg": p.CurrentRowBg, "HighlightRowBg": p.HighlightRowBg,
+		"CurrentFg": p.CurrentFg, "CurrentRowBg": p.CurrentRowBg, "HighlightRowBg": p.HighlightRowBg, "GutterFg": p.GutterFg,
 	}
 	for k, w := range want {
 		if got[k] != w {
@@ -55,6 +55,7 @@ func TestResolve(t *testing.T) {
 			"text":                "#abcdef",
 			"current_worktree_fg": "#123456",
 			"highlight_row_bg":    "#000000",
+			"gutter_fg":           "#654321",
 			"nonsense":            "#ffffff",
 		},
 	})
@@ -67,6 +68,9 @@ func TestResolve(t *testing.T) {
 	}
 	if p.HighlightRowBg != "#000000" {
 		t.Errorf("highlight_row_bg: %q", p.HighlightRowBg)
+	}
+	if p.GutterFg != "#654321" {
+		t.Errorf("gutter_fg: %q", p.GutterFg)
 	}
 	if p.Header != dark.Header {
 		t.Errorf("untouched field changed: %q vs %q", p.Header, dark.Header)
