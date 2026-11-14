@@ -255,12 +255,14 @@ sidebar:
   gutter: 2    # columns, 0 removes it
 ```
 
-A two-column indicator column sits left of every tile: a bright bar for the
-row of the window you are looking at, a dim one for the rest. The live row's
-title also takes the `current_worktree_fg` colour, so it stays findable
-without a highlight. The background band across the full row width belongs to
-the selected row alone: whichever row you move the cursor onto takes the band,
-and only that one.
+A two-column indicator column sits left of every tile. The row of the window
+you are looking at takes the `gutter_fg` colour. Every other row takes its
+task's status colour, so a bar reads the same state as the tmux window pill
+beside it: orange while a task works, red once it blocks. A row with no status
+colour keeps the dimmed colour. The live row's title also takes the
+`current_worktree_fg` colour, so it stays findable without a highlight. The
+background band across the full row width belongs to the selected row alone:
+whichever row you move the cursor onto takes the band, and only that one.
 
 ### Reloading
 
@@ -339,6 +341,11 @@ status:
 ```
 
 A status with no entry renders the default status style.
+
+A task whose status is `working` draws a two-column braille spinner in place
+of its status icon, in its `colour`. The frames advance every 100 ms, and only
+while at least one task is working; the pane and config refresh stay on the
+one-second tick, so an idle sidebar does no extra work.
 
 ### Tasks declared in config
 

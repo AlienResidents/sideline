@@ -267,3 +267,48 @@ a selected non-current row, an unselected current row, shared pane bindings,
 and preserved active-pane markers. A live `tmux capture-pane -p -e` capture
 after installation showed background escapes on exactly one three-line tile.
 Horizontal and compact layouts remain unchanged.
+
+## D27: The selected row band is strong enough for a transparent terminal
+
+The band is a step brighter than the one chosen for a solid background: on a
+transparent terminal with a blurred backdrop, the earlier value was not
+findable at a glance. This replaces the earlier preference for a band subtle
+enough to let the blur show through. Colour lives in the reader's config, not
+in the binary, so the default palette is unchanged.
+
+Evidence: commit `bb78626` in `AlienResidents/dotfiles` moves
+`current_row_bg` and `highlight_row_bg` from `#292e42` to `#3b4261`.
+`~/.config/sideline/config.yaml` carries the new values, and a live
+`tmux capture-pane -p -e` capture of the sidebar pane showed `48;2;59;66;97`
+on the selected row only.
+
+## D28: The gutter bar carries the task's state, and the current-row colour is its own key
+
+The bar reads the same state as the tmux window pill beside it, so the two
+surfaces agree without being derived from one another. The current row takes
+`gutter_fg`, a separate key from `current_worktree_fg`: one palette entry for
+both would have turned the live row's title mauve as well, which was not the
+intent. An inactive row takes its status colour and falls back to the dimmed
+colour when the status has none.
+
+Evidence: `c4900d1` adds `GutterFg` and the `gutter_fg` key, defaulting to
+`#bb9af7`; `gutterBar` in `internal/render/frame.go` reads it for the current
+row only, and `current_worktree_fg` keeps driving the title. `a3b114d` colours
+inactive bars from `cfg.Status` with the dimmed fallback, covered by
+`TestGutterUsesStatusColourOnInactiveRows`. A live capture showed
+`38;2;187;154;247` on the current row's bar and status colours on the rest.
+
+## D29: A working task shows an animated braille spinner
+
+The animation is a second, faster tick, not a shorter main tick: the one-second
+tick is what lists panes and reloads the config, and the documented
+steady-state cost is one `list-panes` per second. The spinner tick advances a
+frame counter and repaints from cached state, and it is armed only while at
+least one task is working, so an idle sidebar gains no work. The frames are
+two characters wide, matching the two-column status glyph column that anchors
+a tile's left edge.
+
+Evidence: `742d07d` adds `spinnerTickMsg` at 100 ms, armed from the task list,
+leaving `ListPanes` and `reloadConfig` on the one-second tick. A live capture
+of a working row showed the frame pair `⠸⠼` in the row's status colour
+`38;2;255;158;100`.
