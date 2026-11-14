@@ -159,6 +159,52 @@ func TestGutterMarksCurrentRow(t *testing.T) {
 	}
 }
 
+func TestGutterUsesStatusColourOnInactiveRows(t *testing.T) {
+	cfg := testConfig()
+	cfg.Sidebar.Gutter = 2
+	cfg.Sidebar.Templates = config.Templates{Tiles: []string{"{primary}"}}
+	cfg.Status = map[string]config.StatusStyle{
+		"waiting": {Colour: "#e0af68"},
+	}
+	panes := []tmux.Pane{
+		{PaneID: "%1", Command: "omp", Active: true, WindowActive: true, Session: "s"},
+		{PaneID: "%2", Command: "omp", Active: true, WindowActive: false, Session: "s"},
+		{PaneID: "%3", Command: "omp", Active: true, WindowActive: false, Session: "s"},
+	}
+	st := &model.State{Tasks: []model.Task{
+		{ID: "a", Title: "front", Status: "waiting", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%1"}},
+		{ID: "b", Title: "idle-wait", Status: "waiting", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%2"}},
+		{ID: "c", Title: "idle-plain", Bind: &model.Binding{Kind: model.BindPane, PaneID: "%3"}},
+	}}
+	out := Frame(Options{Config: cfg, State: st, Panes: panes, Width: 43, Height: 20})
+	checkPane(t, out, 43, 20)
+
+	const gutterFg = "\x1b[38;2;187;154;247m▌"
+	const statusFg = "\x1b[38;2;224;175;104m▌"
+	const dimmedFg = "\x1b[38;2;86;95;137m▌"
+
+	var frontLine, waitLine, plainLine string
+	for _, line := range strings.Split(out, "\n") {
+		switch {
+		case strings.Contains(line, "front"):
+			frontLine = line
+		case strings.Contains(line, "idle-wait"):
+			waitLine = line
+		case strings.Contains(line, "idle-plain"):
+			plainLine = line
+		}
+	}
+	if !strings.Contains(frontLine, gutterFg) {
+		t.Fatalf("current row should use GutterFg even with status, got %q", frontLine)
+	}
+	if !strings.Contains(waitLine, statusFg) {
+		t.Fatalf("inactive row with status should use status colour, got %q", waitLine)
+	}
+	if !strings.Contains(plainLine, dimmedFg) {
+		t.Fatalf("inactive row without status should fall back to Dimmed, got %q", plainLine)
+	}
+}
+
 func TestOnlySelectedRowGetsBand(t *testing.T) {
 	// The full-width band belongs to the selected row alone. The band used
 	// to follow `selected OR current`, so moving the cursor off the live

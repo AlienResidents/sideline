@@ -146,7 +146,7 @@ func blockLines(cfg *config.Config, rows []row, o Options, pal theme.Palette, no
 			continue
 		}
 		if gutter > 0 {
-			bar := gutterBar(r, pal, gutter)
+			bar := gutterBar(r, pal, cfg.Status, gutter)
 			for i := range block {
 				block[i] = bar + block[i]
 			}
@@ -212,12 +212,15 @@ func bgSGR(hex string) string {
 }
 
 // gutterBar is the indicator column left of a tile: a bright bar for the
-// window the user is looking at, a dim one for every other row. It renders at
-// exactly n columns, so the tile content still ends at the pane edge.
-func gutterBar(r row, pal theme.Palette, n int) string {
+// window the user is looking at, the row's status colour when set, or a dim
+// one otherwise. It renders at exactly n columns, so the tile content still
+// ends at the pane edge.
+func gutterBar(r row, pal theme.Palette, statusStyles map[string]config.StatusStyle, n int) string {
 	colour := pal.Dimmed
 	if isCurrentRow(r) {
 		colour = pal.GutterFg
+	} else if st, ok := statusStyles[r.status]; ok && st.Colour != "" {
+		colour = st.Colour
 	}
 	if colour == "" {
 		colour = pal.Text
