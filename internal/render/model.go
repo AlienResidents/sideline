@@ -56,6 +56,9 @@ func (m *Model) reloadConfig(force bool) {
 // reload, and the frame is redrawn.
 type tickMsg struct{}
 
+// spinnerTickMsg drives the 100ms braille spinner animation when any task is working.
+type spinnerTickMsg struct{}
+
 // stateMsg carries one state snapshot from the file watch.
 type stateMsg struct {
 	state *model.State
@@ -107,6 +110,9 @@ type Model struct {
 	// which is how an explicit reload reaches a renderer that has auto_reload
 	// switched off.
 	reloadSeq int64
+
+	spinnerFrame   int
+	spinnerRunning bool
 }
 
 // NewModel builds the interactive model and starts the state watch. It never
@@ -149,11 +155,32 @@ func NewModel(o Options) tea.Model {
 
 // Init starts the tick and the state wait.
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(m.tick(), waitForState(m.stateCh))
+	cmds := []tea.Cmd{m.tick(), waitForState(m.stateCh)}
+	if m.hasWorking() {
+		m.spinnerRunning = true
+		cmds = append(cmds, m.spinnerTick())
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m *Model) tick() tea.Cmd {
 	return tea.Tick(time.Second, func(time.Time) tea.Msg { return tickMsg{} })
+}
+
+func (m *Model) spinnerTick() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(time.Time) tea.Msg { return spinnerTickMsg{} })
+}
+
+func (m *Model) hasWorking() bool {
+	if m.state == nil {
+		return false
+	}
+	for _, t := range m.state.Tasks {
+		if t.Status == "working" {
+			return true
+		}
+	}
+	return false
 }
 
 // waitForState turns the next state watch value into a message. A closed
@@ -191,6 +218,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// The state watch is re-armed from stateMsg, never from the tick:
 		// arming again here would leave one blocked reader per second.
 		return m, m.tick()
+	case spinnerTickMsg:
+		if !m.hasWorking() {
+			m.spinnerRunning = false
+			return m, nil
+		}
+		m.spinnerFrame++
+		return m, m.spinnerTick()
 	case stateMsg:
 		m.pruneBinds(msg.state)
 		if msg.state != nil && msg.state.ReloadSeq != m.reloadSeq {
@@ -200,7 +234,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.state = msg.state
 		m.ensureSelection()
-		return m, waitForState(m.stateCh)
+		cmds := []tea.Cmd{waitForState(m.stateCh)}
+		if m.hasWorking() && !m.spinnerRunning {
+			m.spinnerRunning = true
+			cmds = append(cmds, m.spinnerTick())
+		}
+		return m, tea.Batch(cmds...)
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	case tea.MouseMsg:
@@ -405,6 +444,7 @@ func (m *Model) View() string {
 		Selected: m.selected,
 		Filter:   m.filter,
 		Layout:   m.layout,
+		SpinnerFrame: m.spinnerFrame,
 	})
 	m.lineIDs = ids
 	return text

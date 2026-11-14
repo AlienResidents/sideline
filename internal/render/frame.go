@@ -24,6 +24,7 @@ type Options struct {
 	Selected string // task id
 	Filter   string // case-insensitive substring over id, title, group
 	Layout   string // "" falls back to Config.Sidebar.Layout
+	SpinnerFrame int
 }
 
 // layout resolves the effective layout: the per-call override first, then
@@ -104,7 +105,7 @@ func blockLines(cfg *config.Config, rows []row, o Options, pal theme.Palette, no
 		// Top or bottom: one full-width block per task, no blank separator.
 		var lines, ids []string
 		for _, r := range rows {
-			block := taskLines(r, cfg.Sidebar.Templates.Horizontal, stale(r), r.id == o.Selected, cfg, pal, now, width)
+			block := taskLines(r, cfg.Sidebar.Templates.Horizontal, stale(r), r.id == o.Selected, cfg, pal, now, width, o.SpinnerFrame)
 			lines = append(lines, block...)
 			ids = append(ids, repeatID(r.id, len(block))...)
 		}
@@ -114,7 +115,7 @@ func blockLines(cfg *config.Config, rows []row, o Options, pal theme.Palette, no
 	if o.layout(cfg) == "compact" {
 		var lines, ids []string
 		for _, r := range rows {
-			block := taskLines(r, []string{cfg.Sidebar.Templates.Compact}, stale(r), r.id == o.Selected, cfg, pal, now, width)
+			block := taskLines(r, []string{cfg.Sidebar.Templates.Compact}, stale(r), r.id == o.Selected, cfg, pal, now, width, o.SpinnerFrame)
 			lines = append(lines, block...)
 			ids = append(ids, repeatID(r.id, len(block))...)
 		}
@@ -140,7 +141,7 @@ func blockLines(cfg *config.Config, rows []row, o Options, pal theme.Palette, no
 		// The block decides its own height: an empty variable (a task with
 		// no note) drops that template line instead of leaving a blank row,
 		// so two empty lines never appear between tiles.
-		block := taskLines(r, tiles, stale(r), r.id == o.Selected, cfg, pal, now, contentWidth)
+		block := taskLines(r, tiles, stale(r), r.id == o.Selected, cfg, pal, now, contentWidth, o.SpinnerFrame)
 		if len(block) == 0 {
 			continue
 		}
@@ -232,7 +233,7 @@ func isCurrentRow(r row) bool {
 // taskLines renders one task through each template line, padded or truncated
 // to exactly width visible columns. A stale row is wrapped in a dim fg for the
 // whole block.
-func taskLines(r row, tpls []string, stale, selected bool, cfg *config.Config, pal theme.Palette, now int64, width int) []string {
+func taskLines(r row, tpls []string, stale, selected bool, cfg *config.Config, pal theme.Palette, now int64, width, spinnerFrame int) []string {
 	lines := make([]string, 0, len(tpls))
 	for _, tmpl := range tpls {
 		if stale {
@@ -240,7 +241,7 @@ func taskLines(r row, tpls []string, stale, selected bool, cfg *config.Config, p
 			// directive is expanded into a real escape rather than shown.
 			tmpl = "#[fg=" + pal.Dimmed + "]" + tmpl + "#[default]"
 		}
-		rendered := format.Render(tmpl, rowVars(r, selected, cfg, pal, now), pal, width)
+		rendered := format.Render(tmpl, rowVars(r, selected, cfg, pal, now, spinnerFrame), pal, width)
 		// A template line that expands to nothing but padding carries no
 		// information; keeping it would space every tile as if it had a
 		// third line and push real content off the pane.
@@ -253,7 +254,7 @@ func taskLines(r row, tpls []string, stale, selected bool, cfg *config.Config, p
 }
 
 // rowVars builds the template variables for one task row.
-func rowVars(r row, selected bool, cfg *config.Config, pal theme.Palette, now int64) map[string]string {
+func rowVars(r row, selected bool, cfg *config.Config, pal theme.Palette, now int64, spinnerFrame int) map[string]string {
 	// The reference sidebar highlights the row for the current window, not a
 	// cursor position, so the eye lands on what is in front of you.
 	current := isCurrentRow(r)
@@ -301,7 +302,7 @@ func rowVars(r row, selected bool, cfg *config.Config, pal theme.Palette, now in
 		"group":        r.group,
 		"note":         r.note,
 		"status":       status,
-		"status_icon":  statusIcon(status, cfg.Status, pal),
+		"status_icon":  statusIcon(status, cfg.Status, pal, spinnerFrame),
 		"command_icon": commandIcon(r.pane, cfg.Icons, pal),
 		"agent_icon":   commandIcon(r.pane, cfg.Icons, pal),
 		"agent_label":  commandLabel(r.pane, cfg.Icons),
@@ -351,14 +352,20 @@ func commandLabel(pane *tmux.Pane, icons map[string]config.IconStyle) string {
 // statusIcon wraps the configured status icon in a fg directive so
 // format.Render colours it. A status with no configured icon renders blank;
 // a style without a colour falls back to the palette text colour.
-func statusIcon(status string, styles map[string]config.StatusStyle, pal theme.Palette) string {
+var workingSpinnerFrames = []string{"⠋⠙", "⠙⠹", "⠹⠸", "⠸⠼", "⠼⠴", "⠴⠦", "⠦⠧", "⠧⠇", "⠇⠏", "⠏⠋"}
+
+func statusIcon(status string, styles map[string]config.StatusStyle, pal theme.Palette, spinnerFrame int) string {
 	st, ok := styles[status]
-	if !ok || st.Icon == "" {
-		return ""
-	}
 	colour := st.Colour
 	if colour == "" {
 		colour = pal.Text
+	}
+	if status == "working" {
+		glyph := workingSpinnerFrames[spinnerFrame%len(workingSpinnerFrames)]
+		return "#[fg=" + colour + "]" + glyph + "#[default]"
+	}
+	if !ok || st.Icon == "" {
+		return ""
 	}
 	return "#[fg=" + colour + "]" + st.Icon + "#[default]"
 }

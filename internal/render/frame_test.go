@@ -392,8 +392,8 @@ func TestShellRowTracksForegroundCommand(t *testing.T) {
 		icon    string
 	}{
 		{"bash", "bash", "waiting", "W"},
-		{"vim", "vim", "working", "w"},
-		{"claude", "claude", "working", "w"},
+		{"vim", "vim", "working", "⠋⠙"},
+		{"claude", "claude", "working", "⠋⠙"},
 	}
 	for _, c := range cases {
 		panes := []tmux.Pane{{PaneID: "%5", Command: c.command, Path: "/x/repo"}}
@@ -401,7 +401,7 @@ func TestShellRowTracksForegroundCommand(t *testing.T) {
 		if len(rows) != 1 {
 			t.Fatalf("%s: rows = %d", c.command, len(rows))
 		}
-		vars := rowVars(rows[0], false, cfg, pal, 0)
+		vars := rowVars(rows[0], false, cfg, pal, 0, 0)
 		if vars["primary"] != c.text {
 			t.Errorf("%s: primary = %q, want %q", c.command, vars["primary"], c.text)
 		}
