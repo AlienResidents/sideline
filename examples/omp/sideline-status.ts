@@ -34,11 +34,18 @@ export default function (pi: ExtensionAPI) {
 
   let lastStatus: string | undefined;
   let queue = Promise.resolve();
+  // Resolved once: if the session changes directory, a recomputed id would
+  // create a second row and orphan the first.
+  let cachedID: string | undefined;
 
   function taskID(): string {
+    if (cachedID) {
+      return cachedID;
+    }
     const explicit = process.env.SIDELINE_TASK_ID?.trim();
     if (explicit) {
-      return explicit;
+      cachedID = explicit;
+      return cachedID;
     }
     let dir = "session";
     try {
@@ -46,7 +53,8 @@ export default function (pi: ExtensionAPI) {
     } catch {
       dir = "session";
     }
-    return `${dir}-${pane.replace(/^%/, "")}`;
+    cachedID = `${dir}-${pane.replace(/^%/, "")}`;
+    return cachedID;
   }
 
   function sessionTitle(): string | undefined {
@@ -58,11 +66,42 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
+  // "dir : branch", the middle line of a tile. Resolved once: the branch of
+  // the directory the session started in, which is what the row describes.
+  let cachedGroup: string | undefined;
+
+  function group(): Promise<string> {
+    if (cachedGroup !== undefined) {
+      return Promise.resolve(cachedGroup);
+    }
+    let dir = "session";
+    try {
+      dir = basename(process.cwd()) || "session";
+    } catch {
+      dir = "session";
+    }
+    return pi
+      .exec("git", ["rev-parse", "--abbrev-ref", "HEAD"])
+      .then((result) => {
+        // pi.exec resolves to { stdout, code }, not a bare string.
+        const branch = String(result?.stdout ?? "").trim();
+        cachedGroup = branch ? `${dir} : ${branch}` : dir;
+        return cachedGroup;
+      })
+      .catch(() => {
+        cachedGroup = dir;
+        return cachedGroup;
+      });
+  }
+
   function write(status: string): Promise<void> {
     const args = ["set", taskID(), "--status", status, "--bind-pane", pane];
     const title = sessionTitle();
     if (title) {
       args.push("--title", title);
+    }
+    if (cachedGroup) {
+      args.push("--group", cachedGroup);
     }
     // A missing or stopped sideline must never break the session.
     return pi.exec("sideline", args).then(
@@ -85,6 +124,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     if (!attended(ctx)) return;
+    await group();
     await setStatus("waiting");
   });
 
